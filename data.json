@@ -1,6 +1,6 @@
 {
  "v": 3,
- "majLe": 1784484123337,
+ "majLe": 1784484146693,
  "codes": {
   "a": {
    "libelle": "",
@@ -72,7 +72,7 @@
    "libelle": "",
    "type": "aprem",
    "debut": "13:00",
-   "fin": ""
+   "fin": "20:00"
   },
   "N": {
    "libelle": "",
