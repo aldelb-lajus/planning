@@ -678,15 +678,25 @@ function renderPlanning(){
     return;
   }
   const k0 = keys[0], k1 = keys[keys.length-1];
-  info.innerHTML = `Du <strong>${fmtLong(dateOfKey(k0))}</strong> au <strong>${fmtLongY(dateOfKey(k1))}</strong> · ${keys.length} jours planifiés`;
+  /* les semaines passées sont masquées : l'affichage démarre au lundi de la
+     semaine en cours (les données restent là, l'onglet Exporter y accède) */
+  const lundi = new Date(); lundi.setDate(lundi.getDate() - (lundi.getDay()+6)%7);
+  const kMon = iso(lundi);
+  const kStart = (k0 < kMon && k1 >= kMon) ? kMon : k0;
+  const visibles = keys.filter(k => k >= kStart);
+  const masques = keys.length - visibles.length;
 
-  const miss = keys.filter(k => ["vide","inconnu","sansheure"].includes(statusOf(k))).length;
+  info.innerHTML = `Du <strong>${fmtLong(dateOfKey(kStart))}</strong> au <strong>${fmtLongY(dateOfKey(k1))}</strong>
+    · ${visibles.length} jours`
+    + (masques ? ` <span style="color:var(--ink-soft)">· ${masques} jour${masques>1?"s":""} passé${masques>1?"s":""} masqué${masques>1?"s":""}</span>` : "");
+
+  const miss = visibles.filter(k => ["vide","inconnu","sansheure"].includes(statusOf(k))).length;
   notes.innerHTML = miss ? `<p class="msg warn">${miss} jour${miss>1?"s":""} sans horaire —
     complète les codes dans Réglages, sinon pas de réveil ces jours-là.</p>` : "";
 
   $("viewGrid").setAttribute("aria-pressed", planMode==="grid");
   $("viewList").setAttribute("aria-pressed", planMode==="list");
-  view.innerHTML = planMode==="list" ? listHtml(k0, k1) : gridHtml(k0, k1);
+  view.innerHTML = planMode==="list" ? listHtml(kStart, k1) : gridHtml(kStart, k1);
 }
 
 $("viewGrid").addEventListener("click", ()=>{ planMode = "grid"; renderPlanning(); });
