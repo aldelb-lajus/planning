@@ -1,6 +1,6 @@
 {
  "v": 3,
- "majLe": 1784484673868,
+ "majLe": 1784484678306,
  "codes": {
   "a": {
    "libelle": "",
@@ -66,7 +66,7 @@
    "libelle": "",
    "type": "jour",
    "debut": "07:00",
-   "fin": ""
+   "fin": "19:00"
   },
   "A": {
    "libelle": "",
