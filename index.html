@@ -81,7 +81,7 @@
   td input,td select{padding:7px 8px;font-size:14px;min-height:40px}
   td input[type=text]{min-width:110px}
   .tscroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
-  .tscroll table{min-width:560px}
+  .tscroll table{min-width:300px}
   .delcode{background:transparent;border:none;color:var(--ink-soft);font-size:16px;
     min-height:44px;min-width:44px;padding:0;border-radius:8px}
   .delcode:active{color:var(--danger)}
@@ -94,9 +94,14 @@
     align-items:center;justify-content:center;color:#fff;line-height:1.05;
     font-size:12px;font-weight:700;position:relative;overflow:hidden}
   .cell small{font-size:9px;font-weight:500;opacity:.8;margin-top:1px}
-  .cell.past{opacity:.32}
+  .cell .dnum{position:absolute;top:2px;left:3px;font-size:8.5px;font-weight:600;opacity:.75}
+  .cell.past{opacity:.55}
   .cell.today{box-shadow:inset 0 0 0 2.5px var(--ink)}
-  .cell.off{background:transparent;border:1px dashed var(--rule)}
+  .cell.off{background:transparent;border:1px dashed var(--rule);color:var(--ink-soft)}
+  .mois{grid-column:1/-1;font-size:11px;font-weight:800;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--ink-soft);padding:12px 0 2px}
+  .lmois{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-soft);padding:14px 4px 4px}
   .cell.vide{background:var(--rule);color:var(--ink-soft)}
   .cell .mark{position:absolute;top:2px;right:3px;width:12px;height:12px;line-height:12px;
     font-size:9px;font-weight:800;text-align:center;background:#fff;color:#7A5310;border-radius:50%}
@@ -106,7 +111,7 @@
   .drow{display:flex;align-items:center;gap:8px;padding:6px 4px;min-height:44px;
     border-top:1px solid var(--rule);font-size:13.5px}
   .drow:first-child{border-top:none}
-  .drow.past{opacity:.45}
+  .drow.past{opacity:.55}
   .drow.today{box-shadow:inset 3px 0 0 var(--ink);background:#F3F6F8}
   .drow .ld{width:76px;flex:none;color:var(--ink-soft);font-variant-numeric:tabular-nums;font-weight:600}
   .chip{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;color:#fff;
@@ -156,9 +161,6 @@
 <body>
 
 <div class="wrap">
-  <h1>Réveils du cycle</h1>
-  <p class="sub">Importe ta ligne de planning, l'appli en sort les horaires et tes réveils.</p>
-
   <div id="next"></div>
 
   <!-- ======== onglet Importer ======== -->
@@ -237,6 +239,12 @@
       <p class="hint">En minutes. Utilisé partout&nbsp;: heure de lever affichée, alarmes des exports.</p>
     </div>
     <div class="step">
+      <h2>Tes codes</h2>
+      <div id="codesArea"><p class="msg">Aucun code pour l'instant. Ils apparaîtront au premier import.</p></div>
+      <p class="hint">À remplir une seule fois : les horaires sont réutilisés d'un cycle à l'autre.
+        <strong>M</strong> et <strong>m</strong> sont deux postes différents.</p>
+    </div>
+    <div class="step">
       <h2>Calendrier</h2>
       <label for="calName">Nom du calendrier pour les exports</label>
       <input type="text" id="calName" value="Travail" placeholder="ex. Planning Fab">
@@ -267,12 +275,6 @@
       <p class="hint">Le fichier contient codes, planning et réglages&nbsp;: c'est lui qui sert à passer
         d'un appareil à l'autre (AirDrop, mail, Drive…). À l'import, ce qui vient du fichier remplace
         ce qui existe en double, le reste est conservé.</p>
-    </div>
-    <div class="step">
-      <h2>Tes codes</h2>
-      <div id="codesArea"><p class="msg">Aucun code pour l'instant. Ils apparaîtront au premier import.</p></div>
-      <p class="hint">À remplir une seule fois : les horaires sont réutilisés d'un cycle à l'autre.
-        <strong>M</strong> et <strong>m</strong> sont deux postes différents.</p>
     </div>
   </section>
 </div>
@@ -524,16 +526,12 @@ function renderCodes(){
     return a < b ? -1 : a > b ? 1 : 0;
   });
 
-  let h = '<div class="tscroll"><table><thead><tr><th>Code</th><th>Libellé</th><th>Type</th><th>Début</th><th>Fin</th><th></th></tr></thead><tbody>';
+  let h = '<div class="tscroll"><table><thead><tr><th>Code</th><th>Début</th><th>Fin</th><th></th></tr></thead><tbody>';
   codesList.forEach(c=>{
     const k = ref[c];
-    const opts = Object.entries(TYPES).map(([v,t])=>
-      `<option value="${v}"${k.type===v?" selected":""}>${t.lbl}</option>`).join("");
     const off = k.type==="repos" ? " disabled" : "";
     h += `<tr${pend.includes(c) ? ' class="pend"' : ''}>
-      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}</td>
-      <td><input type="text" data-c="${esc(c)}" data-f="libelle" value="${esc(k.libelle)}" placeholder="ex. Matin semaine" aria-label="Libellé du code ${esc(c)}"></td>
-      <td><select data-c="${esc(c)}" data-f="type" aria-label="Type du code ${esc(c)}">${opts}</select></td>
+      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}${k.type==="repos" ? ' <span style="font-weight:500;color:var(--ink-soft)">repos</span>' : ''}</td>
       <td><input type="time" data-c="${esc(c)}" data-f="debut" value="${k.debut}"${off} aria-label="Heure de début du code ${esc(c)}"></td>
       <td><input type="time" data-c="${esc(c)}" data-f="fin" value="${k.fin}"${off} aria-label="Heure de fin du code ${esc(c)}"></td>
       <td><button class="delcode" data-del="${esc(c)}" aria-label="Supprimer le code ${esc(c)}">✕</button></td>
@@ -599,27 +597,40 @@ function renderNext(){
 }
 
 /* ================= rendu grille / liste sur une plage ================= */
+const moisLbl = dt => {
+  const t = dt.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
+  return t.charAt(0).toUpperCase()+t.slice(1);
+};
+
 function gridHtml(k0, k1){
   const tk = todayKey();
   /* caler la grille sur la semaine : lundi avant k0, dimanche après k1 */
   const d0 = dateOfKey(k0); d0.setDate(d0.getDate() - (d0.getDay()+6)%7);
   const d1 = dateOfKey(k1); d1.setDate(d1.getDate() + (7-d1.getDay())%7);
   let h = '<div class="grid">' + DOW.map(d=>`<div class="dow">${d}</div>`).join("");
-  for(let dt = new Date(d0); dt <= d1; dt.setDate(dt.getDate()+1)){
-    const key = iso(dt);
-    const st = statusOf(key);
-    if(st==="off"){ h += `<div class="cell off" title="${dt.toLocaleDateString("fr-FR")} — non planifié"></div>`; continue; }
-    const c = jours[key];
-    const k = ref[c];
-    const type = (st==="vide" || st==="inconnu") ? null : k.type;
-    let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
-    if(st==="vide" || st==="inconnu") cls += " vide";
-    const bg = type ? `background:${TYPES[type].c}` : "";
-    const hr = (st==="ok") ? `<small>${k.debut}</small>` : "";
-    const mark = (st==="sansheure" || st==="inconnu" || st==="vide") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
-    const titles = {vide:"cellule vide", inconnu:"code inconnu", sansheure:"horaire manquant"};
-    const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "");
-    h += `<div class="${cls}" style="${bg}" title="${title}">${esc(c)||"·"}${hr}${mark}</div>`;
+  for(let ws = new Date(d0); ws <= d1; ws.setDate(ws.getDate()+7)){
+    /* libellé de mois avant la première semaine et avant chaque semaine contenant un 1er */
+    let lab = ws.getTime()===d0.getTime() ? dateOfKey(k0) : null;
+    for(let i=0;i<7;i++){ const d = new Date(ws); d.setDate(d.getDate()+i); if(d.getDate()===1) lab = d; }
+    if(lab) h += `<div class="mois">${moisLbl(lab)}</div>`;
+    for(let i=0;i<7;i++){
+      const dt = new Date(ws); dt.setDate(dt.getDate()+i);
+      const key = iso(dt);
+      const st = statusOf(key);
+      const dnum = `<span class="dnum">${dt.getDate()}</span>`;
+      if(st==="off"){ h += `<div class="cell off" title="${dt.toLocaleDateString("fr-FR")} — non planifié">${dnum}</div>`; continue; }
+      const c = jours[key];
+      const k = ref[c];
+      const type = (st==="vide" || st==="inconnu") ? null : k.type;
+      let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
+      if(st==="vide" || st==="inconnu") cls += " vide";
+      const bg = type ? `background:${TYPES[type].c}` : "";
+      const hr = (st==="ok") ? `<small>${k.debut}</small>` : "";
+      const mark = (st==="sansheure" || st==="inconnu" || st==="vide") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
+      const titles = {vide:"cellule vide", inconnu:"code inconnu", sansheure:"horaire manquant"};
+      const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "");
+      h += `<div class="${cls}" style="${bg}" title="${title}">${dnum}${esc(c)||"·"}${hr}${mark}</div>`;
+    }
   }
   return h + "</div>";
 }
@@ -628,7 +639,10 @@ function listHtml(k0, k1){
   const tk = todayKey();
   let h = '<div class="dlist">';
   const d1 = dateOfKey(k1);
+  let curMois = "";
   for(let dt = dateOfKey(k0); dt <= d1; dt.setDate(dt.getDate()+1)){
+    const m = moisLbl(dt);
+    if(m !== curMois){ curMois = m; h += `<div class="lmois">${m}</div>`; }
     const key = iso(dt);
     const st = statusOf(key);
     const c = jours[key];
@@ -642,7 +656,7 @@ function listHtml(k0, k1){
     else if(st==="repos")      det = TYPES.repos.lbl;
     else if(st==="sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
     else{
-      det = `${esc(k.libelle || TYPES[k.type].lbl)} · ${k.debut}–${k.fin || k.debut}`;
+      det = `${TYPES[k.type].lbl} · ${k.debut}–${k.fin || k.debut}`;
       const w = minusMinutes(dt, k.debut, prefs.lead);
       lever = `<span class="lever">${iso(w)!==key ? "<small>veille</small> " : ""}${pad(w.getHours())}:${pad(w.getMinutes())}</span>`;
     }
@@ -755,7 +769,7 @@ function buildIcs(k0, k1){
       "DTSTAMP:" + stamp,
       "DTSTART:" + key + "T" + dh + dm + "00",
       "DTEND:"   + iso(end) + "T" + fh + fm + "00",
-      "SUMMARY:" + escIcs(k.libelle ? `${k.libelle} (${c})` : c),
+      "SUMMARY:" + escIcs(c),
       "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Debout",
       "TRIGGER:-PT" + (prefs.lead||0) + "M","END:VALARM","END:VEVENT");
     s.ok++;
@@ -1066,7 +1080,7 @@ $("calName").addEventListener("change", ()=>{
   $("calName").value = prefs.calName;
 
   renderAll();
-  showTab(keys.length ? "planning" : "importer");
+  showTab("planning");
 
   renderSyncUI();
   if(SYNC_REPO){
