@@ -1,6 +1,6 @@
 {
  "v": 3,
- "majLe": 1784483010891,
+ "majLe": 1784483014946,
  "codes": {
   "a": {
    "libelle": "",
@@ -53,7 +53,7 @@
   "M": {
    "libelle": "",
    "type": "matin",
-   "debut": "",
+   "debut": "06:00",
    "fin": ""
   },
   "Bp1": {
