@@ -1,6 +1,6 @@
 {
  "v": 3,
- "majLe": 1784482997917,
+ "majLe": 1784483010891,
  "codes": {
   "a": {
    "libelle": "",
@@ -11,7 +11,7 @@
   "Bp": {
    "libelle": "",
    "type": "autre",
-   "debut": "",
+   "debut": "08:00",
    "fin": ""
   },
   "m": {
@@ -59,13 +59,13 @@
   "Bp1": {
    "libelle": "",
    "type": "autre",
-   "debut": "",
+   "debut": "08:00",
    "fin": ""
   },
   "J": {
    "libelle": "",
    "type": "jour",
-   "debut": "",
+   "debut": "08:00",
    "fin": ""
   },
   "A": {
@@ -83,7 +83,7 @@
   "B": {
    "libelle": "",
    "type": "autre",
-   "debut": "",
+   "debut": "08:00",
    "fin": ""
   }
  },
