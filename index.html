@@ -419,6 +419,17 @@ function minusMinutes(dt, hhmm, mins){
 
 /* ---------- le planning : un seul, par jour ---------- */
 const planKeys = () => Object.keys(jours).sort();
+
+/* Ménage : les jours plus vieux de 90 jours sortent du planning. Appliqué de la
+   même façon sur toutes les données (locales, reçues, publiées) et sans jamais
+   compter comme une modification — sinon un simple lecteur divergerait du dépôt. */
+const pruneCutoff = () => { const d = new Date(); d.setDate(d.getDate()-90); return iso(d); };
+function pruneJours(o){
+  const cutoff = pruneCutoff();
+  let ch = false;
+  Object.keys(o||{}).forEach(k=>{ if(k < cutoff){ delete o[k]; ch = true; } });
+  return ch;
+}
 const pendingCodes = () =>
   Object.keys(ref).filter(c => ref[c].type!=="repos" && !ref[c].debut);
 
@@ -625,7 +636,7 @@ function gridHtml(k0, k1){
       let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
       if(st==="vide" || st==="inconnu") cls += " vide";
       const bg = type ? `background:${TYPES[type].c}` : "";
-      const hr = (st==="ok") ? `<small>${k.debut}</small>` : "";
+      const hr = (st==="ok") ? `<small>${k.debut}</small>${k.fin && k.fin!==k.debut ? `<small>${k.fin}</small>` : ""}` : "";
       const mark = (st==="sansheure" || st==="inconnu" || st==="vide") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
       const titles = {vide:"cellule vide", inconnu:"code inconnu", sansheure:"horaire manquant"};
       const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "");
@@ -887,6 +898,7 @@ function applyRemote(s){
   applying = true;
   ref   = s.codes || {};
   jours = s.jours || {};
+  pruneJours(jours);
   prefs = Object.assign({lead:45, calName:"Travail"}, s.prefs || {});
   saveRef(); saveJours(); savePrefs();
   applying = false;
@@ -968,7 +980,12 @@ async function syncNow(force){
         setSyncStatus("Modifications locales non publiées — ce n'est pas l'appareil éditeur (pas de jeton).", true);
       }
     }else{
-      setSyncStatus("À jour (" + hhmm() + ").");
+      /* rien de nouveau de part et d'autre : l'éditeur en profite pour purger
+         du data.json les jours trop anciens qui y traîneraient encore */
+      if(ghToken && remote && remote.jours && Object.keys(remote.jours).some(k=> k < pruneCutoff()))
+        await pushState();
+      else
+        setSyncStatus("À jour (" + hhmm() + ").");
     }
   }catch(e){
     if(!navigator.onLine) setSyncStatus("Hors ligne — la synchro reprendra au retour du réseau.", true);
@@ -1071,11 +1088,9 @@ $("calName").addEventListener("change", ()=>{
     }catch(e){} }
   }
 
-  /* ménage : les jours plus vieux de 90 jours sortent du planning */
-  const cutoff = (d=>{ d.setDate(d.getDate()-90); return iso(d); })(new Date());
-  let pruned = false;
-  Object.keys(jours).forEach(k=>{ if(k < cutoff){ delete jours[k]; pruned = true; } });
-  if(pruned) saveJours();
+  /* ménage silencieux : ne passe pas par saveJours pour ne pas compter comme
+     une modification locale (bump) — chaque appareil purge la même chose */
+  if(pruneJours(jours)) store.set("cycle:jours", wrap(jours));
 
   /* date de début proposée : lendemain du dernier jour planifié, sinon aujourd'hui */
   const keys = planKeys();
