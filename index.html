@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#175E5A">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%8F%B0%3C/text%3E%3C/svg%3E">
+<title>Réveils du cycle</title>
+<style>
+  :root{
+    --paper:#E7EBEF;
+    --card:#FFFFFF;
+    --ink:#111A22;
+    --ink-soft:#5A6976;
+    --rule:#C9D2DA;
+    --act:#175E5A;
+    --danger:#B3402A;
+    --matin:#DE9520;
+    --aprem:#B8496B;
+    --nuit:#2E4A8C;
+    --jour:#5C7A2E;
+    --repos:#9AA6B2;
+    --autre:#6B5E8C;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+  .wrap{max-width:760px;margin:0 auto;padding:22px 16px 104px}
+
+  h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+  .sub{color:var(--ink-soft);font-size:14px;margin:0 0 18px}
+  a{color:var(--act)}
+
+  .step{background:var(--card);border:1px solid var(--rule);border-radius:12px;
+    padding:16px;margin-bottom:16px}
+  .step > h2{font-size:12px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.09em;color:var(--ink-soft);margin:0 0 12px}
+
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 5px}
+  .hint{font-size:12.5px;color:var(--ink-soft);margin:6px 0 0}
+
+  textarea,input,select{font-family:inherit;font-size:15px;color:var(--ink);
+    background:var(--card);border:1px solid var(--rule);border-radius:8px;
+    padding:9px 10px;width:100%;min-height:44px}
+  textarea{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13px;
+    min-height:88px;resize:vertical;white-space:pre;overflow-x:auto}
+  input:focus,textarea:focus,select:focus{outline:2px solid var(--act);outline-offset:1px;border-color:var(--act)}
+
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+  .row > div{flex:1;min-width:130px}
+
+  button{font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
+    border-radius:8px;padding:11px 16px;min-height:44px;border:1px solid var(--act);
+    background:var(--act);color:#fff}
+  button:active{opacity:.75}
+  button.ghost{background:transparent;color:var(--act)}
+  button.ghost.danger{border-color:var(--danger);color:var(--danger)}
+  button:disabled{opacity:.45;cursor:default}
+  button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  button[aria-pressed="true"]{background:var(--act);color:#fff}
+
+  /* --- messages --- */
+  .msg{font-size:13.5px;color:var(--ink-soft);padding:10px 12px;
+    background:var(--paper);border-radius:8px;border:1px solid var(--rule);margin:10px 0 0}
+  .msg.warn{border-color:#C58A2E;color:#7A5310;background:#FBF2E2}
+  .msg.ok{border-color:var(--act);color:var(--act);background:#E9F2F1}
+
+  /* --- tableau des codes --- */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--ink-soft);font-weight:700;padding:0 6px 7px 0;white-space:nowrap}
+  td{padding:5px 6px 5px 0;vertical-align:middle}
+  td:last-child,th:last-child{padding-right:0}
+  tr.pend td{background:#FBF2E2}
+  tr.pend td:first-child{border-radius:6px 0 0 6px}
+  tr.pend td:last-child{border-radius:0 6px 6px 0}
+  .code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;
+    font-size:14px;white-space:nowrap}
+  .swatch{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:1px}
+  td input,td select{padding:7px 8px;font-size:14px;min-height:40px}
+  td input[type=text]{min-width:110px}
+  .tscroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
+  .tscroll table{min-width:560px}
+  .delcode{background:transparent;border:none;color:var(--ink-soft);font-size:16px;
+    min-height:44px;min-width:44px;padding:0;border-radius:8px}
+  .delcode:active{color:var(--danger)}
+
+  /* --- grille du planning --- */
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:10px}
+  .dow{font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--ink-soft);text-align:center;font-weight:700;padding-bottom:2px}
+  .cell{aspect-ratio:1;border-radius:5px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;color:#fff;line-height:1.05;
+    font-size:12px;font-weight:700;position:relative;overflow:hidden}
+  .cell small{font-size:9px;font-weight:500;opacity:.8;margin-top:1px}
+  .cell.past{opacity:.32}
+  .cell.today{box-shadow:inset 0 0 0 2.5px var(--ink)}
+  .cell.off{background:transparent;border:1px dashed var(--rule)}
+  .cell.vide{background:var(--rule);color:var(--ink-soft)}
+  .cell .mark{position:absolute;top:2px;right:3px;width:12px;height:12px;line-height:12px;
+    font-size:9px;font-weight:800;text-align:center;background:#fff;color:#7A5310;border-radius:50%}
+
+  /* --- vue liste jour par jour --- */
+  .dlist{margin-top:10px}
+  .drow{display:flex;align-items:center;gap:8px;padding:6px 4px;min-height:44px;
+    border-top:1px solid var(--rule);font-size:13.5px}
+  .drow:first-child{border-top:none}
+  .drow.past{opacity:.45}
+  .drow.today{box-shadow:inset 3px 0 0 var(--ink);background:#F3F6F8}
+  .drow .ld{width:76px;flex:none;color:var(--ink-soft);font-variant-numeric:tabular-nums;font-weight:600}
+  .chip{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;color:#fff;
+    border-radius:5px;padding:3px 7px;font-size:12px;flex:none;min-width:34px;text-align:center}
+  .drow .det{flex:1;min-width:0}
+  .drow .lever{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .drow .lever small{font-weight:500;color:var(--ink-soft)}
+  .warn-t{color:#7A5310;font-weight:600}
+
+  /* --- prochain réveil --- */
+  .next{background:var(--ink);color:#fff;border-radius:12px;padding:18px 16px;margin-bottom:16px}
+  .next .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;opacity:.6;font-weight:700}
+  .next .hour{font-size:44px;font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:2px 0}
+  .next .det{font-size:13.5px;opacity:.78}
+  .next.rest .hour{font-size:26px}
+
+  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .btns button{padding:9px 13px;font-size:14px}
+
+  .foot{font-size:12.5px;color:var(--ink-soft);margin-top:20px;line-height:1.55}
+
+  /* --- navigation basse --- */
+  .tabs{position:fixed;bottom:0;left:0;right:0;z-index:10;background:var(--card);
+    border-top:1px solid var(--rule);display:flex;justify-content:center;gap:4px;
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+  .tabs button{flex:1;max-width:170px;min-height:52px;border:none;background:transparent;
+    color:var(--ink-soft);font-weight:700;font-size:13.5px;border-radius:10px;padding:6px 2px}
+  .tabs button[aria-current="page"]{color:var(--act);background:var(--paper)}
+  .tabs .badge{display:inline-block;background:var(--danger);color:#fff;font-size:11px;
+    font-weight:700;border-radius:99px;min-width:17px;padding:1px 5px;margin-left:4px;vertical-align:1px}
+
+  /* --- impression (export PDF via « Enregistrer en PDF ») --- */
+  #printArea{display:none}
+  @media print{
+    body > *:not(#printArea){display:none !important}
+    #printArea{display:block !important;padding:8px}
+    #printArea h1{font-size:20px;margin:0 0 2px}
+    #printArea .psub{font-size:12px;color:#333;margin:0 0 12px}
+    .cell,.chip{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cell{font-size:10px}
+    .drow{min-height:auto;padding:3px 4px;font-size:11px;break-inside:avoid}
+    .cell.past,.drow.past{opacity:.55}
+  }
+  @media (prefers-reduced-motion:no-preference){.cell{transition:opacity .2s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Réveils du cycle</h1>
+  <p class="sub">Importe ta ligne de planning, l'appli en sort les horaires et tes réveils.</p>
+
+  <div id="next"></div>
+
+  <!-- ======== onglet Importer ======== -->
+  <section class="tab" data-tab="importer" hidden>
+    <div class="step">
+      <h2>Ta ligne</h2>
+      <textarea id="line" placeholder="Colle ici les codes de ton cycle, un par jour."></textarea>
+      <div class="row">
+        <div>
+          <label for="start">Premier jour du cycle</label>
+          <input type="date" id="start">
+        </div>
+      </div>
+      <div id="parseInfo"></div>
+      <div class="row">
+        <button id="saveCycle" disabled>Ajouter au planning</button>
+      </div>
+      <div id="saveMsg"></div>
+    </div>
+    <p class="foot">Tout se calcule dans ton navigateur. Ta ligne ne part sur aucun serveur.<br>
+    Les données restent sur cet appareil&nbsp;— utilise Réglages → Sauvegarde pour les transporter.</p>
+  </section>
+
+  <!-- ======== onglet Planning ======== -->
+  <section class="tab" data-tab="planning" hidden>
+    <div class="step">
+      <h2>Ton planning</h2>
+      <p class="meta hint" id="planInfo" style="margin:0"></p>
+      <div id="planNotes"></div>
+      <div class="btns">
+        <button class="ghost" id="viewGrid" aria-pressed="true">Grille</button>
+        <button class="ghost" id="viewList" aria-pressed="false">Liste</button>
+      </div>
+      <div id="planView"></div>
+      <div class="btns">
+        <button class="ghost danger" id="clearPlan">Effacer le planning</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== onglet Export ======== -->
+  <section class="tab" data-tab="export" hidden>
+    <div class="step">
+      <h2>Exporter</h2>
+      <div class="row" style="margin-top:0">
+        <div>
+          <label for="expStart">Du</label>
+          <input type="date" id="expStart">
+        </div>
+        <div>
+          <label for="expEnd">Au (inclus)</label>
+          <input type="date" id="expEnd">
+        </div>
+      </div>
+      <p class="hint" id="expInfo"></p>
+      <div class="btns">
+        <button id="expIcs">Exporter .ics</button>
+        <button class="ghost" id="expGcal">Google Agenda</button>
+        <button class="ghost" id="expPdfGrid">PDF grille</button>
+        <button class="ghost" id="expPdfList">PDF liste</button>
+      </div>
+      <div id="exportMsg"></div>
+    </div>
+    <p class="foot">.ics&nbsp;: ouvre le fichier téléchargé, l'iPhone propose de l'ajouter à un calendrier.<br>
+    PDF&nbsp;: la boîte d'impression s'ouvre, choisis «&nbsp;Enregistrer en PDF&nbsp;».<br>
+    Les alertes du calendrier ne sonnent pas en mode silencieux&nbsp;— c'est le raccourci
+    «&nbsp;Réveils&nbsp;» qui pose les vraies alarmes à partir de ces événements.</p>
+  </section>
+
+  <!-- ======== onglet Réglages ======== -->
+  <section class="tab" data-tab="reglages" hidden>
+    <div class="step">
+      <h2>Réveil</h2>
+      <label for="lead">Se lever combien de temps avant la prise de poste&nbsp;?</label>
+      <input type="number" id="lead" min="0" max="240" step="5" value="45" inputmode="numeric">
+      <p class="hint">En minutes. Utilisé partout&nbsp;: heure de lever affichée, alarmes des exports.</p>
+    </div>
+    <div class="step">
+      <h2>Calendrier</h2>
+      <label for="calName">Nom du calendrier pour les exports</label>
+      <input type="text" id="calName" value="Travail" placeholder="ex. Planning Fab">
+      <p class="hint">Le fichier .ics porte ce nom. À l'import (iPhone ou Google Agenda),
+        choisis ou crée le sous-calendrier du même nom — «&nbsp;Travail&nbsp;», «&nbsp;Planning Fab&nbsp;»…</p>
+    </div>
+    <div class="step">
+      <h2>Synchronisation</h2>
+      <p class="hint" id="syncInfo" style="margin:0 0 10px"></p>
+      <div id="syncCfg" hidden>
+        <label for="ghToken">Jeton GitHub — seulement sur l'appareil qui modifie le planning</label>
+        <input type="password" id="ghToken" placeholder="github_pat_… ou ghp_…" autocomplete="off">
+        <div class="row">
+          <button class="ghost" id="tokenSave">Enregistrer le jeton</button>
+          <button id="syncNowBtn">Synchroniser maintenant</button>
+        </div>
+      </div>
+      <p class="hint" id="syncStatus" aria-live="polite"></p>
+    </div>
+    <div class="step">
+      <h2>Sauvegarde</h2>
+      <div class="row" style="margin-top:0">
+        <button class="ghost" id="expJson">Exporter les données (.json)</button>
+        <button class="ghost" id="impJsonBtn">Importer des données</button>
+      </div>
+      <input type="file" id="impJson" accept=".json,application/json" hidden>
+      <div id="backupMsg"></div>
+      <p class="hint">Le fichier contient codes, planning et réglages&nbsp;: c'est lui qui sert à passer
+        d'un appareil à l'autre (AirDrop, mail, Drive…). À l'import, ce qui vient du fichier remplace
+        ce qui existe en double, le reste est conservé.</p>
+    </div>
+    <div class="step">
+      <h2>Tes codes</h2>
+      <div id="codesArea"><p class="msg">Aucun code pour l'instant. Ils apparaîtront au premier import.</p></div>
+      <p class="hint">À remplir une seule fois : les horaires sont réutilisés d'un cycle à l'autre.
+        <strong>M</strong> et <strong>m</strong> sont deux postes différents.</p>
+    </div>
+  </section>
+</div>
+
+<div id="printArea"></div>
+
+<nav class="tabs" aria-label="Navigation">
+  <button data-tab="planning" aria-current="false">Planning</button>
+  <button data-tab="importer" aria-current="false">Importer</button>
+  <button data-tab="export" aria-current="false">Exporter</button>
+  <button data-tab="reglages" aria-current="false">Réglages<span id="reglagesBadge" class="badge" hidden></span></button>
+</nav>
+
+<script>
+"use strict";
+
+/* ===== synchronisation =====
+   Le planning partagé vit dans un fichier data.json à la racine du dépôt GitHub
+   qui héberge le site. Hébergé sur GitHub Pages, le dépôt est déduit tout seul
+   de l'adresse — rien à configurer. Hébergé ailleurs (Scaleway…), renseigner
+   SYNC_REPO_CFG sous la forme "compte/depot". Vide et hors GitHub Pages :
+   pas de synchro, tout reste local. */
+const SYNC_REPO_CFG = "";
+const SYNC_BRANCH   = "main";
+const SYNC_PATH     = "data.json";
+
+let SYNC_REPO = SYNC_REPO_CFG;
+if(!SYNC_REPO && location.hostname.endsWith(".github.io")){
+  const owner = location.hostname.split(".")[0];
+  const seg = location.pathname.split("/").filter(s=>s && !s.endsWith(".html"));
+  SYNC_REPO = owner + "/" + (seg.length ? seg[0] : owner + ".github.io");
+}
+
+/* ---------- stockage, tolérant à l'environnement ---------- */
+const store = {
+  async get(k){
+    try{ if(window.storage){ const r = await window.storage.get(k); return r? r.value : null; } }catch(e){}
+    try{ return localStorage.getItem(k); }catch(e){ return null; }
+  },
+  async set(k,v){
+    try{ if(window.storage){ await window.storage.set(k,v); return; } }catch(e){}
+    try{ localStorage.setItem(k,v); }catch(e){}
+  }
+};
+
+const VERSION = 3;
+const TYPES = {
+  matin:{lbl:"Matin",      c:"var(--matin)"},
+  aprem:{lbl:"Après-midi", c:"var(--aprem)"},
+  nuit: {lbl:"Nuit",       c:"var(--nuit)"},
+  jour: {lbl:"Journée",    c:"var(--jour)"},
+  repos:{lbl:"Repos",      c:"var(--repos)"},
+  autre:{lbl:"Autre",      c:"var(--autre)"}
+};
+const DOW = ["L","M","Me","J","V","S","D"];
+
+let ref = {};        // référentiel : code -> {libelle, type, debut, fin}
+let jours = {};      // LE planning : "AAAAMMJJ" -> code (un seul, réécrit à chaque import)
+let prefs = {lead:45, calName:"Travail"};
+let pasteCells = []; // codes découpés de l'onglet Importer
+let planMode = "grid"; // vue du planning : "grid" | "list"
+
+/* synchro */
+let meta = {majLe:0};  // horodatage du dernier changement local (clé cycle:meta)
+let ghToken = "";      // jeton GitHub, stocké localement, seulement sur l'appareil éditeur
+let syncSha = null;    // sha du data.json distant, nécessaire pour écrire
+let syncTimer = null, syncBusy = false, applying = false, lastPull = 0;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+
+/* ---------- persistance ---------- */
+const wrap = data => JSON.stringify({v:VERSION, data});
+function unwrap(raw){
+  if(raw==null) return null;
+  try{ const o = JSON.parse(raw); return (o && typeof o==="object" && "data" in o) ? o.data : o; }
+  catch(e){ return null; }
+}
+/* Tout enregistrement local marque un changement (majLe) et programme une synchro,
+   sauf quand on est en train d'appliquer des données reçues du dépôt. */
+function bump(){
+  if(applying) return;
+  /* toujours strictement après le dernier état appliqué, même si les horloges
+     des appareils divergent — sinon une modif locale se ferait écraser */
+  meta.majLe = Math.max(Date.now(), (meta.majLe||0) + 1);
+  store.set("cycle:meta", wrap(meta));
+  scheduleSync();
+}
+const saveRef   = () => { store.set("cycle:codes", wrap(ref)); bump(); };
+const saveJours = () => { store.set("cycle:jours", wrap(jours)); bump(); };
+const savePrefs = () => { store.set("cycle:prefs", wrap(prefs)); bump(); };
+const saveMeta  = () => store.set("cycle:meta", wrap(meta));
+const saveToken = () => store.set("cycle:token", wrap(ghToken));
+
+/* ---------- découpage de la ligne ---------- */
+/* Cellule d'en-tête : contient un espace ou dépasse 4 caractères (nom, mention de
+   validation…). Les codes de poste font au plus 3-4 caractères, sans espace. */
+const isHeaderCell = c => c.includes(" ") || c.length > 4;
+
+function parseLine(raw){
+  if(!raw.trim()) return {head:[], codes:[]};
+  let parts = raw.includes("\t")
+    ? raw.replace(/\r?\n/g,"\t").split("\t").map(s=>s.trim())
+    : raw.trim().split(/\s+/);
+  while(parts.length && parts[parts.length-1]==="") parts.pop();
+  /* L'en-tête peut contenir des cellules courtes (n° d'équipe, validation) :
+     on coupe après la dernière cellule d'allure « en-tête » trouvée en début de ligne. */
+  let cut = 0;
+  for(let i=0; i<Math.min(parts.length, 8); i++)
+    if(parts[i] !== "" && isHeaderCell(parts[i])) cut = i+1;
+  return {head:parts.slice(0,cut), codes:parts.slice(cut)};
+}
+
+function guessType(code){
+  const c = code.toLowerCase();
+  if(c.startsWith("r")) return "repos";
+  if(c.startsWith("m")) return "matin";
+  if(c.startsWith("a")) return "aprem";
+  if(c.startsWith("n")) return "nuit";
+  if(c.startsWith("j")) return "jour";
+  return "autre";
+}
+
+/* ---------- dates (locales, sans UTC) ---------- */
+const pad = n => String(n).padStart(2,"0");
+function dateFrom(s){ const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
+function addDays(s,i){ const dt = dateFrom(s); dt.setDate(dt.getDate()+i); return dt; }
+const iso = dt => dt.getFullYear()+pad(dt.getMonth()+1)+pad(dt.getDate());
+const isoInput = dt => dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate());
+const dateOfKey = k => new Date(+k.slice(0,4), +k.slice(4,6)-1, +k.slice(6,8));
+const keyOfInput = s => s.replaceAll("-","");
+const todayKey = () => iso(new Date());
+const fmtLong  = dt => dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+const fmtLongY = dt => dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+const fmtShort = dt => dt.toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"2-digit"});
+
+function minusMinutes(dt, hhmm, mins){
+  const [h,m] = hhmm.split(":").map(Number);
+  const d = new Date(dt); d.setHours(h, m-mins, 0, 0);
+  return d;
+}
+
+/* ---------- le planning : un seul, par jour ---------- */
+const planKeys = () => Object.keys(jours).sort();
+const pendingCodes = () =>
+  Object.keys(ref).filter(c => ref[c].type!=="repos" && !ref[c].debut);
+
+/* Statut d'un jour : "off" (rien de planifié), "vide" (cellule vide importée),
+   "inconnu", "repos", "sansheure", "ok". */
+function statusOf(key){
+  if(!(key in jours)) return "off";
+  const c = jours[key];
+  if(c === "") return "vide";
+  const k = ref[c];
+  if(!k) return "inconnu";
+  if(k.type === "repos") return "repos";
+  if(!k.debut) return "sansheure";
+  return "ok";
+}
+
+/* ================= onglet Importer ================= */
+function renderImporter(){
+  const raw = $("line").value;
+  const {head, codes} = parseLine(raw);
+  pasteCells = codes;
+  const box = $("parseInfo");
+  const startV = $("start").value;
+
+  if(!raw.trim()){ box.innerHTML=""; $("saveCycle").disabled = true; return; }
+
+  let h = "";
+  if(head.length)
+    h += `<p class="msg">En-tête détecté et ignoré&nbsp;: ${head.map(esc).join(" · ")}</p>`;
+
+  if(!codes.length){
+    h += `<p class="msg warn">Aucun code détecté dans ce collage.</p>`;
+  }else if(startV){
+    const d0 = dateFrom(startV), d1 = addDays(startV, codes.length-1);
+    h += `<p class="msg"><strong>${codes.length} jours</strong> depuis le ${fmtLong(d0)}
+      → fin le <strong>${fmtLongY(d1)}</strong> (= début + ${codes.length-1} jours).</p>`;
+    if(codes.length % 7 === 0)
+      h += `<p class="msg ok">Soit ${codes.length/7} semaine${codes.length>7?"s":""} complète${codes.length>7?"s":""}.</p>`;
+    else
+      h += `<p class="msg warn">${codes.length} n'est pas un multiple de 7 — c'est presque toujours
+        une erreur de collage. Vérifie qu'il ne manque pas de cellules.</p>`;
+
+    let rewrite = 0;
+    for(let i=0;i<codes.length;i++) if(iso(addDays(startV,i)) in jours) rewrite++;
+    if(rewrite)
+      h += `<p class="msg warn">${rewrite} jour${rewrite>1?"s":""} déjà planifié${rewrite>1?"s":""}
+        ser${rewrite>1?"ont":"a"} réécrit${rewrite>1?"s":""} par cet import.</p>`;
+  }else{
+    h += `<p class="msg warn">Choisis le premier jour du cycle pour voir les dates.</p>`;
+  }
+
+  const vides = codes.filter(c=>c==="").length;
+  if(vides)
+    h += `<p class="msg warn">${vides} cellule${vides>1?"s":""} vide${vides>1?"s":""} au milieu de la ligne&nbsp;:
+      ces jours n'auront pas de réveil.</p>`;
+
+  const unk = [...new Set(codes)].filter(c => c && !ref[c]);
+  if(unk.length)
+    h += `<p class="msg warn">Nouveau${unk.length>1?"x":""} code${unk.length>1?"s":""}&nbsp;:
+      ${unk.map(esc).join(", ")}. Ils seront ajoutés dans Réglages, à compléter avec leurs horaires.</p>`;
+
+  box.innerHTML = h;
+  $("saveCycle").disabled = !(codes.length && startV);
+}
+
+function saveCycle(){
+  const startV = $("start").value;
+  if(!startV || !pasteCells.length) return;
+
+  const unk = [...new Set(pasteCells)].filter(c => c && !ref[c]);
+  unk.forEach(c => ref[c] = {libelle:"", type:guessType(c), debut:"", fin:""});
+
+  pasteCells.forEach((c,i)=>{ jours[iso(addDays(startV,i))] = c; });
+  saveRef(); saveJours();
+
+  $("line").value = "";
+  const p = pendingCodes();
+  const keys = planKeys();
+  $("expEnd").value = isoInput(dateOfKey(keys[keys.length-1]));   /* la plage d'export suit le planning */
+  renderAll();
+  $("saveMsg").innerHTML = `<p class="msg ok">Planning mis à jour — voir l'onglet Planning.</p>`
+    + (p.length ? `<p class="msg warn">${p.length} code${p.length>1?"s":""} sans horaire
+       (${p.map(esc).join(", ")})&nbsp;: à compléter dans Réglages, sinon ces jours ne sonneront pas.</p>` : "");
+}
+
+/* ================= Réglages : codes ================= */
+function renderCodes(){
+  const box = $("codesArea");
+  const codesList = Object.keys(ref);
+  const pend = pendingCodes();
+
+  const badge = $("reglagesBadge");
+  badge.hidden = !pend.length;
+  badge.textContent = pend.length || "";
+
+  if(!codesList.length){
+    box.innerHTML = '<p class="msg">Aucun code pour l\'instant. Ils apparaîtront au premier import.</p>';
+    return;
+  }
+
+  /* codes en attente d'horaire en premier, puis ordre alphabétique (sensible à la casse) */
+  codesList.sort((a,b)=>{
+    const pa = pend.includes(a), pb = pend.includes(b);
+    if(pa !== pb) return pa ? -1 : 1;
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+
+  let h = '<div class="tscroll"><table><thead><tr><th>Code</th><th>Libellé</th><th>Type</th><th>Début</th><th>Fin</th><th></th></tr></thead><tbody>';
+  codesList.forEach(c=>{
+    const k = ref[c];
+    const opts = Object.entries(TYPES).map(([v,t])=>
+      `<option value="${v}"${k.type===v?" selected":""}>${t.lbl}</option>`).join("");
+    const off = k.type==="repos" ? " disabled" : "";
+    h += `<tr${pend.includes(c) ? ' class="pend"' : ''}>
+      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}</td>
+      <td><input type="text" data-c="${esc(c)}" data-f="libelle" value="${esc(k.libelle)}" placeholder="ex. Matin semaine" aria-label="Libellé du code ${esc(c)}"></td>
+      <td><select data-c="${esc(c)}" data-f="type" aria-label="Type du code ${esc(c)}">${opts}</select></td>
+      <td><input type="time" data-c="${esc(c)}" data-f="debut" value="${k.debut}"${off} aria-label="Heure de début du code ${esc(c)}"></td>
+      <td><input type="time" data-c="${esc(c)}" data-f="fin" value="${k.fin}"${off} aria-label="Heure de fin du code ${esc(c)}"></td>
+      <td><button class="delcode" data-del="${esc(c)}" aria-label="Supprimer le code ${esc(c)}">✕</button></td>
+    </tr>`;
+  });
+  box.innerHTML = h + "</tbody></table></div>";
+
+  if(pend.length){
+    const p = document.createElement("p");
+    p.className = "msg warn";
+    p.textContent = `Il manque l'heure de début pour : ${pend.join(", ")}. Ces jours n'auront pas de réveil.`;
+    box.appendChild(p);
+  }
+
+  box.querySelectorAll("[data-c]").forEach(el=>{
+    el.addEventListener("change", e=>{
+      const t = e.target;
+      ref[t.dataset.c][t.dataset.f] = t.value;
+      saveRef(); renderAll();
+    });
+  });
+  box.querySelectorAll("[data-del]").forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const c = el.dataset.del;
+      const used = Object.values(jours).filter(x=>x===c).length;
+      const extra = used ? ` Il est utilisé sur ${used} jour${used>1?"s":""} planifié${used>1?"s":""} : ces jours n'auront plus de réveil.` : "";
+      if(!confirm(`Supprimer le code ${c} ?${extra}`)) return;
+      delete ref[c]; saveRef(); renderAll();
+    });
+  });
+}
+
+/* ================= prochain réveil (bandeau global) ================= */
+function renderNext(){
+  const box = $("next");
+  const keys = planKeys();
+  if(!keys.length){ box.innerHTML = ""; return; }
+
+  const tk = todayKey(), now = new Date();
+  for(const key of keys){
+    if(key < tk) continue;
+    const code = jours[key];
+    const dt = dateOfKey(key);
+    const k = ref[code];
+    if(!k || (!k.debut && k.type!=="repos")) continue;   /* pas d'horaire : signalé ailleurs */
+    if(k.type==="repos"){
+      if(key===tk) continue;
+      box.innerHTML = `<div class="next rest"><div class="lbl">Prochain jour</div>
+        <div class="hour">Repos</div>
+        <div class="det">${fmtLong(dt)} · pas de réveil</div></div>`;
+      return;
+    }
+    const w = minusMinutes(dt, k.debut, prefs.lead);
+    if(w < now) continue;                                 /* réveil déjà passé aujourd'hui */
+    box.innerHTML = `<div class="next"><div class="lbl">Prochain réveil</div>
+      <div class="hour">${pad(w.getHours())}:${pad(w.getMinutes())}</div>
+      <div class="det">${fmtLong(w)} · poste ${esc(code)} à ${k.debut}</div></div>`;
+    return;
+  }
+  box.innerHTML = `<div class="next rest"><div class="lbl">Prochain réveil</div>
+    <div class="hour">Rien à venir</div>
+    <div class="det">Le planning est terminé — importe la suite.</div></div>`;
+}
+
+/* ================= rendu grille / liste sur une plage ================= */
+function gridHtml(k0, k1){
+  const tk = todayKey();
+  /* caler la grille sur la semaine : lundi avant k0, dimanche après k1 */
+  const d0 = dateOfKey(k0); d0.setDate(d0.getDate() - (d0.getDay()+6)%7);
+  const d1 = dateOfKey(k1); d1.setDate(d1.getDate() + (7-d1.getDay())%7);
+  let h = '<div class="grid">' + DOW.map(d=>`<div class="dow">${d}</div>`).join("");
+  for(let dt = new Date(d0); dt <= d1; dt.setDate(dt.getDate()+1)){
+    const key = iso(dt);
+    const st = statusOf(key);
+    if(st==="off"){ h += `<div class="cell off" title="${dt.toLocaleDateString("fr-FR")} — non planifié"></div>`; continue; }
+    const c = jours[key];
+    const k = ref[c];
+    const type = (st==="vide" || st==="inconnu") ? null : k.type;
+    let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
+    if(st==="vide" || st==="inconnu") cls += " vide";
+    const bg = type ? `background:${TYPES[type].c}` : "";
+    const hr = (st==="ok") ? `<small>${k.debut}</small>` : "";
+    const mark = (st==="sansheure" || st==="inconnu" || st==="vide") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
+    const titles = {vide:"cellule vide", inconnu:"code inconnu", sansheure:"horaire manquant"};
+    const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "");
+    h += `<div class="${cls}" style="${bg}" title="${title}">${esc(c)||"·"}${hr}${mark}</div>`;
+  }
+  return h + "</div>";
+}
+
+function listHtml(k0, k1){
+  const tk = todayKey();
+  let h = '<div class="dlist">';
+  const d1 = dateOfKey(k1);
+  for(let dt = dateOfKey(k0); dt <= d1; dt.setDate(dt.getDate()+1)){
+    const key = iso(dt);
+    const st = statusOf(key);
+    const c = jours[key];
+    const k = c ? ref[c] : null;
+    let cls = "drow" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
+    const chipBg = (st==="off" || st==="vide" || st==="inconnu") ? "var(--rule);color:var(--ink-soft)" : TYPES[k.type].c;
+    let det = "", lever = "";
+    if(st==="off")             det = `<span style="color:var(--ink-soft)">non planifié</span>`;
+    else if(st==="vide")       det = `<span class="warn-t">cellule vide — pas de réveil</span>`;
+    else if(st==="inconnu")    det = `<span class="warn-t">code inconnu — pas de réveil</span>`;
+    else if(st==="repos")      det = TYPES.repos.lbl;
+    else if(st==="sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
+    else{
+      det = `${esc(k.libelle || TYPES[k.type].lbl)} · ${k.debut}–${k.fin || k.debut}`;
+      const w = minusMinutes(dt, k.debut, prefs.lead);
+      lever = `<span class="lever">${iso(w)!==key ? "<small>veille</small> " : ""}${pad(w.getHours())}:${pad(w.getMinutes())}</span>`;
+    }
+    h += `<div class="${cls}"><span class="ld">${fmtShort(dt)}</span>
+      <span class="chip" style="background:${chipBg}">${esc(c||"")||"·"}</span>
+      <span class="det">${det}</span>${lever}</div>`;
+  }
+  return h + "</div>";
+}
+
+/* ================= onglet Planning ================= */
+function renderPlanning(){
+  const keys = planKeys();
+  const info = $("planInfo"), notes = $("planNotes"), view = $("planView");
+  if(!keys.length){
+    info.textContent = "";
+    notes.innerHTML = "";
+    view.innerHTML = `<p class="msg">Aucun planning pour l'instant — passe par l'onglet Importer.</p>`;
+    return;
+  }
+  const k0 = keys[0], k1 = keys[keys.length-1];
+  info.innerHTML = `Du <strong>${fmtLong(dateOfKey(k0))}</strong> au <strong>${fmtLongY(dateOfKey(k1))}</strong> · ${keys.length} jours planifiés`;
+
+  const miss = keys.filter(k => ["vide","inconnu","sansheure"].includes(statusOf(k))).length;
+  notes.innerHTML = miss ? `<p class="msg warn">${miss} jour${miss>1?"s":""} sans horaire —
+    complète les codes dans Réglages, sinon pas de réveil ces jours-là.</p>` : "";
+
+  $("viewGrid").setAttribute("aria-pressed", planMode==="grid");
+  $("viewList").setAttribute("aria-pressed", planMode==="list");
+  view.innerHTML = planMode==="list" ? listHtml(k0, k1) : gridHtml(k0, k1);
+}
+
+$("viewGrid").addEventListener("click", ()=>{ planMode = "grid"; renderPlanning(); });
+$("viewList").addEventListener("click", ()=>{ planMode = "list"; renderPlanning(); });
+$("clearPlan").addEventListener("click", ()=>{
+  if(!Object.keys(jours).length) return;
+  if(!confirm("Effacer tout le planning ?\nLes codes et leurs horaires sont conservés. Les événements déjà envoyés au calendrier ne seront pas retirés.")) return;
+  jours = {}; saveJours(); renderAll();
+});
+
+/* ================= onglet Export ================= */
+function exportRange(){
+  const a = $("expStart").value, b = $("expEnd").value;
+  if(!a || !b) return null;
+  const k0 = keyOfInput(a), k1 = keyOfInput(b);
+  return k0 <= k1 ? {k0, k1} : null;
+}
+
+function renderExport(){
+  const keys = planKeys();
+  const r = exportRange();
+  if(!keys.length){ $("expInfo").textContent = "Aucun planning à exporter pour l'instant."; return; }
+  if(!r){ $("expInfo").textContent = "Choisis une plage de dates valide (début avant fin)."; return; }
+  const n = keys.filter(k => k>=r.k0 && k<=r.k1).length;
+  $("expInfo").textContent = n
+    ? n + " jour" + (n>1?"s":"") + " planifié" + (n>1?"s":"") + " dans cette plage."
+    : "Aucun jour planifié dans cette plage.";
+}
+
+/* valeurs par défaut : aujourd'hui → dernier jour planifié */
+function setExportDefaults(){
+  const keys = planKeys();
+  if(!keys.length) return;
+  const tk = todayKey();
+  const first = keys.find(k=>k>=tk) || keys[0];
+  if(!$("expStart").value) $("expStart").value = isoInput(dateOfKey(first));
+  if(!$("expEnd").value || keyOfInput($("expEnd").value) < keyOfInput($("expStart").value))
+    $("expEnd").value = isoInput(dateOfKey(keys[keys.length-1]));
+}
+
+/* ---------- export .ics ---------- */
+/* Heures locales flottantes : pas de suffixe Z, pas de conversion UTC, pour que
+   06h00 reste 06h00 des deux côtés du changement d'heure. */
+const escIcs = s => String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
+const icsHead = () => ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Reveils du cycle//FR",
+  "CALSCALE:GREGORIAN","X-WR-CALNAME:" + escIcs(prefs.calName || "Travail")];
+function icsStamp(){
+  const n = new Date();
+  return n.getUTCFullYear()+pad(n.getUTCMonth()+1)+pad(n.getUTCDate())
+    +"T"+pad(n.getUTCHours())+pad(n.getUTCMinutes())+pad(n.getUTCSeconds())+"Z";
+}
+
+function download(txt, name, mime){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([txt],{type:mime||"text/calendar"}));
+  a.download = name;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+}
+
+function buildIcs(k0, k1){
+  const out = icsHead();
+  const stamp = icsStamp();
+  const s = {ok:0, repos:0, miss:0};
+  planKeys().forEach(key=>{
+    if(key < k0 || key > k1) return;
+    const st = statusOf(key);
+    if(st==="repos"){ s.repos++; return; }
+    if(st!=="ok"){ s.miss++; return; }
+    const c = jours[key];
+    const k = ref[c];
+    const dt = dateOfKey(key);
+    const fin = k.fin || k.debut;
+    const [dh,dm] = k.debut.split(":");
+    const [fh,fm] = fin.split(":");
+    const end = new Date(dt);
+    if(fin <= k.debut) end.setDate(end.getDate()+1);   /* poste de nuit : fin le lendemain */
+    out.push("BEGIN:VEVENT",
+      "UID:" + key + "@reveils-cycle",
+      "DTSTAMP:" + stamp,
+      "DTSTART:" + key + "T" + dh + dm + "00",
+      "DTEND:"   + iso(end) + "T" + fh + fm + "00",
+      "SUMMARY:" + escIcs(k.libelle ? `${k.libelle} (${c})` : c),
+      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Debout",
+      "TRIGGER:-PT" + (prefs.lead||0) + "M","END:VALARM","END:VEVENT");
+    s.ok++;
+  });
+  out.push("END:VCALENDAR");
+  return {txt: out.join("\r\n"), s};
+}
+
+function doExport(versGoogle){
+  const r = exportRange();
+  if(!r){ $("exportMsg").innerHTML = `<p class="msg warn">Choisis une plage de dates valide.</p>`; return; }
+  const {txt, s} = buildIcs(r.k0, r.k1);
+  if(!s.ok){
+    $("exportMsg").innerHTML = `<p class="msg warn">Aucun poste exploitable dans cette plage — vérifie les dates et les horaires dans Réglages.</p>`;
+    return;
+  }
+  const parts = [`<strong>${s.ok} poste${s.ok>1?"s":""} exporté${s.ok>1?"s":""}</strong>`];
+  if(s.repos) parts.push(`${s.repos} jour${s.repos>1?"s":""} de repos`);
+  if(s.miss)  parts.push(`<strong>${s.miss} jour${s.miss>1?"s":""} ignoré${s.miss>1?"s":""} faute d'horaire</strong>`);
+  let em = `<p class="msg ${s.miss ? "warn" : "ok"}">${parts.join(" · ")}.</p>`;
+
+  const cal = esc(prefs.calName || "Travail");
+  if(versGoogle){
+    em += `<p class="msg">Pour Google Agenda, avec le fichier téléchargé&nbsp;:<br>
+      1. Sur <a href="https://calendar.google.com" target="_blank" rel="noopener">calendar.google.com</a>,
+      crée une fois le calendrier «&nbsp;${cal}&nbsp;» (Autres agendas → +).<br>
+      2. Ouvre <a href="https://calendar.google.com/calendar/u/0/r/settings/export" target="_blank" rel="noopener">Paramètres
+      → Importer et exporter</a>.<br>
+      3. Choisis le fichier et le calendrier «&nbsp;${cal}&nbsp;», puis Importer.</p>`;
+  }else{
+    em += `<p class="msg">À l'ouverture du fichier sur iPhone, ajoute les événements au calendrier
+      «&nbsp;${cal}&nbsp;».</p>`;
+  }
+  $("exportMsg").innerHTML = em;
+  download(txt, "reveils-" + $("expStart").value + "_" + $("expEnd").value + ".ics");
+}
+
+/* ---------- export PDF : vue imprimable + boîte d'impression ---------- */
+function doPdf(mode){
+  const r = exportRange();
+  if(!r){ $("exportMsg").innerHTML = `<p class="msg warn">Choisis une plage de dates valide.</p>`; return; }
+  $("printArea").innerHTML =
+    `<h1>Réveils du cycle</h1>
+     <p class="psub">Du ${fmtLong(dateOfKey(r.k0))} au ${fmtLongY(dateOfKey(r.k1))} · lever ${prefs.lead} min avant la prise de poste</p>`
+    + (mode==="list" ? listHtml(r.k0, r.k1) : gridHtml(r.k0, r.k1));
+  const old = document.title;
+  document.title = "planning-" + $("expStart").value + "_" + $("expEnd").value;
+  window.print();
+  document.title = old;
+}
+
+$("expIcs").addEventListener("click", ()=> doExport(false));
+$("expGcal").addEventListener("click", ()=> doExport(true));
+$("expPdfGrid").addEventListener("click", ()=> doPdf("grid"));
+$("expPdfList").addEventListener("click", ()=> doPdf("list"));
+$("expStart").addEventListener("change", renderExport);
+$("expEnd").addEventListener("change", renderExport);
+
+/* ---------- sauvegarde .json ---------- */
+const backupPayload = () => JSON.stringify({v:VERSION, codes:ref, jours, prefs}, null, 1);
+$("expJson").addEventListener("click", ()=>
+  download(backupPayload(), "reveils-donnees-" + isoInput(new Date()) + ".json", "application/json"));
+$("impJsonBtn").addEventListener("click", ()=> $("impJson").click());
+$("impJson").addEventListener("change", async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const s = JSON.parse(await file.text());
+    if(!s || typeof s !== "object" || (!s.codes && !s.jours && !s.plannings)) throw new Error("format");
+    Object.assign(ref, s.codes || {});
+    Object.assign(jours, s.jours || {});
+    /* anciens fichiers (v2) : les cycles sont aplatis, le plus récent collage gagne */
+    if(Array.isArray(s.plannings))
+      [...s.plannings].sort((a,b)=>(a.creeLe||0)-(b.creeLe||0)).forEach(p=>
+        (p.codes||[]).forEach((c,i)=>{ jours[iso(addDays(p.dateDebut,i))] = c; }));
+    if(s.prefs) prefs = Object.assign({lead:45, calName:"Travail"}, s.prefs);
+    saveRef(); saveJours(); savePrefs();
+    $("lead").value = prefs.lead;
+    $("calName").value = prefs.calName;
+    renderAll();
+    $("backupMsg").innerHTML = '<p class="msg ok">Données importées.</p>';
+  }catch(err){
+    $("backupMsg").innerHTML = '<p class="msg warn">Fichier illisible — utilise un fichier exporté depuis l\'appli.</p>';
+  }
+  e.target.value = "";
+});
+
+/* ---------- synchronisation via data.json dans le dépôt du site ---------- */
+/* Tous les appareils LISENT le fichier automatiquement (aucune configuration).
+   Seul l'appareil où un jeton est enregistré ÉCRIT, via l'API GitHub.
+   L'état est comparé par horodatage majLe : le plus récent gagne en bloc. */
+const b64e = s => btoa(unescape(encodeURIComponent(s)));
+const b64d = s => decodeURIComponent(escape(atob(String(s).replace(/\s/g,""))));
+const syncPayload = () => JSON.stringify({v:VERSION, majLe:meta.majLe, codes:ref, jours, prefs}, null, 1);
+const apiUrl = () => "https://api.github.com/repos/" + SYNC_REPO + "/contents/" + SYNC_PATH;
+
+function setSyncStatus(txt, warn){
+  const el = $("syncStatus");
+  el.textContent = txt;
+  el.style.color = warn ? "#7A5310" : "";
+}
+const hhmm = () => new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
+
+function applyRemote(s){
+  applying = true;
+  ref   = s.codes || {};
+  jours = s.jours || {};
+  prefs = Object.assign({lead:45, calName:"Travail"}, s.prefs || {});
+  saveRef(); saveJours(); savePrefs();
+  applying = false;
+  meta.majLe = s.majLe || Date.now();
+  saveMeta();
+  $("lead").value = prefs.lead;
+  $("calName").value = prefs.calName;
+  renderAll();
+}
+
+function scheduleSync(){
+  if(!SYNC_REPO || applying) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(()=>{ syncTimer = null; syncNow(true); }, 2500);
+}
+
+async function ghFetch(method, body){
+  const headers = {"Accept":"application/vnd.github+json"};
+  if(ghToken) headers["Authorization"] = "Bearer " + ghToken;
+  const r = await fetch(apiUrl() + (method==="GET" ? "?ref=" + SYNC_BRANCH + "&t=" + Date.now() : ""), {
+    method, headers, cache:"no-store",
+    body: body ? JSON.stringify(body) : undefined
+  });
+  return r;
+}
+
+async function pushState(){
+  const body = {
+    message: "maj planning " + new Date().toLocaleDateString("fr-FR"),
+    content: b64e(syncPayload()),
+    branch: SYNC_BRANCH
+  };
+  if(syncSha) body.sha = syncSha;
+  const r = await ghFetch("PUT", body);
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json();
+  syncSha = j.content && j.content.sha;
+  setSyncStatus("Publié pour les autres appareils à " + hhmm() + ".");
+}
+
+async function syncNow(force){
+  if(!SYNC_REPO || syncBusy) return;
+  if(!force && Date.now() - lastPull < 60000) return;   /* limite d'API : pas plus d'une lecture/min */
+  syncBusy = true;
+  try{
+    const r = await ghFetch("GET");
+    lastPull = Date.now();
+    let remote = null;
+    if(r.status === 404){
+      remote = null;                                    /* pas encore de data.json dans le dépôt */
+    }else if(r.ok){
+      const j = await r.json();
+      syncSha = j.sha;
+      try{ remote = JSON.parse(b64d(j.content)); }catch(e){ remote = null; }
+    }else{
+      throw new Error("HTTP " + r.status);
+    }
+
+    const remoteMaj = remote ? (remote.majLe || 0) : 0;
+    if(remoteMaj > meta.majLe){
+      applyRemote(remote);
+      setSyncStatus("À jour — planning reçu à " + hhmm() + ".");
+    }else if(meta.majLe > remoteMaj){
+      if(ghToken){
+        try{ await pushState(); }
+        catch(e){
+          if(String(e.message).match(/409|422/)){       /* écrit entre-temps : on relit puis on retente */
+            const r2 = await ghFetch("GET");
+            if(r2.ok){ const j2 = await r2.json(); syncSha = j2.sha;
+              const rem2 = JSON.parse(b64d(j2.content));
+              if((rem2.majLe||0) > meta.majLe){ applyRemote(rem2); setSyncStatus("À jour — planning reçu à " + hhmm() + "."); }
+              else await pushState();
+            }
+          }else if(String(e.message).includes("401") || String(e.message).includes("403"))
+            setSyncStatus("Jeton refusé par GitHub — vérifie le jeton et ses droits (Contents, lecture-écriture).", true);
+          else throw e;
+        }
+      }else{
+        setSyncStatus("Modifications locales non publiées — ce n'est pas l'appareil éditeur (pas de jeton).", true);
+      }
+    }else{
+      setSyncStatus("À jour (" + hhmm() + ").");
+    }
+  }catch(e){
+    if(!navigator.onLine) setSyncStatus("Hors ligne — la synchro reprendra au retour du réseau.", true);
+    else setSyncStatus("Synchro impossible (" + e.message + ") — nouvel essai plus tard.", true);
+  }
+  syncBusy = false;
+}
+
+function renderSyncUI(){
+  if(!SYNC_REPO){
+    $("syncInfo").textContent = "Non configurée : renseigne la constante SYNC_REPO en tête du fichier index.html avant la mise en ligne (voir README). En attendant, tout reste sur cet appareil.";
+    $("syncCfg").hidden = true;
+    return;
+  }
+  $("syncInfo").innerHTML = `Le planning est lu automatiquement depuis le fichier <strong>${esc(SYNC_PATH)}</strong>
+    du dépôt <strong>${esc(SYNC_REPO)}</strong> — rien à configurer pour consulter.
+    Seul l'appareil où tu importes le planning a besoin du jeton (voir README pour le créer).`;
+  $("syncCfg").hidden = false;
+  $("ghToken").value = ghToken;
+}
+
+$("tokenSave").addEventListener("click", ()=>{
+  ghToken = $("ghToken").value.trim();
+  saveToken();
+  setSyncStatus(ghToken ? "Jeton enregistré sur cet appareil." : "Jeton effacé — cet appareil ne publie plus.");
+  if(ghToken) syncNow(true);
+});
+$("syncNowBtn").addEventListener("click", ()=> syncNow(true));
+
+/* ---------- rendu global & navigation ---------- */
+function renderAll(){
+  renderImporter();
+  renderCodes();
+  renderNext();
+  renderPlanning();
+  setExportDefaults();
+  renderExport();
+}
+
+function showTab(name){
+  document.querySelectorAll(".tab").forEach(s=> s.hidden = s.dataset.tab !== name);
+  document.querySelectorAll(".tabs button").forEach(b=>
+    b.setAttribute("aria-current", b.dataset.tab === name ? "page" : "false"));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll(".tabs button").forEach(b=>
+  b.addEventListener("click", ()=> showTab(b.dataset.tab)));
+
+$("line").addEventListener("input", ()=>{ $("saveMsg").innerHTML=""; renderImporter(); });
+$("start").addEventListener("change", renderImporter);
+$("saveCycle").addEventListener("click", saveCycle);
+$("lead").addEventListener("input", ()=>{
+  prefs.lead = Math.max(0, parseInt($("lead").value)||0);
+  savePrefs(); renderNext(); renderPlanning();
+});
+$("calName").addEventListener("change", ()=>{
+  prefs.calName = $("calName").value.trim() || "Travail";
+  savePrefs();
+});
+
+/* ---------- chargement + migrations ---------- */
+(async ()=>{
+  const rawC = await store.get("cycle:codes");
+  const rawJ = await store.get("cycle:jours");
+  const rawF = await store.get("cycle:prefs");
+  const rawM = await store.get("cycle:meta");
+  const rawK = await store.get("cycle:token");
+
+  if(rawC) ref = unwrap(rawC) || {};
+  if(rawJ) jours = unwrap(rawJ) || {};
+  if(rawF) prefs = Object.assign({lead:45, calName:"Travail"}, unwrap(rawF));
+  if(rawM) meta = Object.assign({majLe:0}, unwrap(rawM));
+  if(rawK) ghToken = unwrap(rawK) || "";
+
+  /* Migration v2 → v3 : les cycles empilés deviennent un seul planning,
+     le plus récent collage gagne sur les dates communes. Uniquement si
+     cycle:jours n'existe pas encore ; l'ancienne clé est laissée en place. */
+  if(rawJ === null){
+    const rawP = await store.get("cycle:plannings");
+    if(rawP){
+      const plannings = unwrap(rawP);
+      if(Array.isArray(plannings)){
+        [...plannings].sort((a,b)=>(a.creeLe||0)-(b.creeLe||0)).forEach(p=>
+          (p.codes||[]).forEach((c,i)=>{ jours[iso(addDays(p.dateDebut,i))] = c; }));
+        saveJours();
+      }
+    }
+  }
+
+  /* Migration v1 : référentiel des codes, si aucun référentiel v2/v3 */
+  if(rawC === null){
+    const v1 = await store.get("cycle:v1");
+    if(v1){ try{
+      const s = JSON.parse(v1);
+      Object.entries(s.codes || {}).forEach(([c,k])=>{
+        ref[c] = {libelle:"", type:k.type || guessType(c), debut:k.debut||"", fin:k.fin||""};
+      });
+      if(s.lead != null) prefs.lead = parseInt(s.lead) || 45;
+      saveRef(); savePrefs();
+    }catch(e){} }
+  }
+
+  /* ménage : les jours plus vieux de 90 jours sortent du planning */
+  const cutoff = (d=>{ d.setDate(d.getDate()-90); return iso(d); })(new Date());
+  let pruned = false;
+  Object.keys(jours).forEach(k=>{ if(k < cutoff){ delete jours[k]; pruned = true; } });
+  if(pruned) saveJours();
+
+  /* date de début proposée : lendemain du dernier jour planifié, sinon aujourd'hui */
+  const keys = planKeys();
+  if(keys.length){
+    const last = dateOfKey(keys[keys.length-1]);
+    last.setDate(last.getDate()+1);
+    $("start").value = isoInput(last);
+  }else{
+    $("start").value = isoInput(new Date());
+  }
+  $("lead").value = prefs.lead;
+  $("calName").value = prefs.calName;
+
+  renderAll();
+  showTab(keys.length ? "planning" : "importer");
+
+  renderSyncUI();
+  if(SYNC_REPO){
+    syncNow(true);
+    window.addEventListener("online", ()=> syncNow(true));
+    document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) syncNow(); });
+  }
+})();
+</script>
+</body>
+</html>
