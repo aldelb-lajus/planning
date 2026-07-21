@@ -1,0 +1,7 @@
+# Ne JAMAIS publier le jeton GitHub
+github_pat_*.txt
+*.pat
+
+# Fichiers de travail / anciennes versions
+note-decisions-v2.md
+planning-reveils.html

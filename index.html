@@ -346,14 +346,20 @@ const TYPES = {
   nuit: {lbl:"Nuit",       c:"var(--nuit)"},
   jour: {lbl:"Journée",    c:"var(--jour)"},
   repos:{lbl:"Repos",      c:"var(--repos)"},
-  vacances:{lbl:"Vacances", c:"var(--vacances)"},
+  vacances:{lbl:"Vacs", c:"var(--vacances)"},
   autre:{lbl:"Autre",      c:"var(--autre)"}
 };
 /* jours sans réveil : repos et vacances (informatifs, jamais d'alarme) */
 const NOALARM = t => t==="repos" || t==="vacances";
 const DOW = ["L","M","Me","J","V","S","D"];
-/* palette de codes proposée dans l'éditeur d'un jour (ordre par type) */
-const KNOWN_CODES = ["M","m","A","a","N","Ne","Nf","Nwe","J","B","Bp","Bp1","R","Rh"];
+/* palette de codes proposée dans l'éditeur d'un jour. La casse n'est pas
+   significative (A = a, M = m…) : ces orthographes sont les formes canoniques. */
+const KNOWN_CODES = ["M","A","N","Ne","Nf","Nwe","J","B","Bp","Bp1","R","Rh"];
+/* horaires par défaut à la création d'un code. « N » est un double poste :
+   deux créneaux dans la même journée (00:00–06:30 et 19:30–00:00). */
+const CODE_DEFAULTS = {
+  "N": {type:"nuit", debut:"00:00", fin:"06:30", debut2:"19:30", fin2:"00:00"}
+};
 
 let ref = {};        // référentiel : code -> {libelle, type, debut, fin}
 let jours = {};      // LE planning : "AAAAMMJJ" -> code (un seul, réécrit à chaque import)
@@ -420,6 +426,52 @@ function guessType(code){
   if(c.startsWith("n")) return "nuit";
   if(c.startsWith("j")) return "jour";
   return "autre";
+}
+
+/* Forme canonique d'un code, insensible à la casse : « a » → « A », « nWE » → « Nwe ».
+   La palette standard prime, puis les codes déjà connus. */
+function canon(code){
+  if(!code) return code;
+  const low = code.toLowerCase();
+  for(const k of KNOWN_CODES) if(k.toLowerCase() === low) return k;
+  for(const k of Object.keys(ref)) if(k.toLowerCase() === low) return k;
+  return code;
+}
+
+/* Crée l'entrée d'un code, avec ses horaires par défaut s'ils sont connus. */
+function newCode(c){
+  const d = CODE_DEFAULTS[c];
+  return d ? Object.assign({libelle:"", debut:"", fin:""}, d)
+           : {libelle:"", type:guessType(c), debut:"", fin:""};
+}
+
+/* Créneaux de travail d'un code (1, ou 2 pour un double poste comme N). */
+function segsOf(k){
+  const s = [];
+  if(k.debut)  s.push({debut:k.debut,  fin:k.fin  || k.debut});
+  if(k.debut2) s.push({debut:k.debut2, fin:k.fin2 || k.debut2});
+  return s;
+}
+
+/* Mise en conformité des données (casse fusionnée, N en double poste, Vacances→Vacs).
+   Modifie ref/jours en place ; le sauvegarde est laissé à l'appelant. */
+function migrate(){
+  let ch = false;
+  if(ref["Vacances"]){ if(!ref["Vacs"]) ref["Vacs"] = ref["Vacances"]; ref["Vacs"].type = "vacances"; delete ref["Vacances"]; ch = true; }
+  const remap = {};
+  Object.keys(ref).forEach(c=>{
+    const cc = canon(c);
+    if(cc !== c){ if(!ref[cc]) ref[cc] = ref[c]; delete ref[c]; remap[c] = cc; ch = true; }
+  });
+  Object.keys(jours).forEach(k=>{
+    const v = jours[k];
+    if(v === "Vacances"){ jours[k] = "Vacs"; ch = true; return; }
+    if(!v) return;
+    const cv = remap[v] || canon(v);
+    if(cv !== v){ jours[k] = cv; ch = true; }
+  });
+  if(ref["N"] && !("debut2" in ref["N"])){ Object.assign(ref["N"], CODE_DEFAULTS["N"]); ch = true; }
+  return ch;
 }
 
 /* ---------- dates (locales, sans UTC) ---------- */
@@ -511,7 +563,7 @@ function renderImporter(){
     h += `<p class="msg warn">${vides} cellule${vides>1?"s":""} vide${vides>1?"s":""} au milieu de la ligne&nbsp;:
       ces jours n'auront pas de réveil.</p>`;
 
-  const unk = [...new Set(codes)].filter(c => c && !ref[c]);
+  const unk = [...new Set(codes.map(c=> c?canon(c):""))].filter(c => c && !ref[c]);
   if(unk.length)
     h += `<p class="msg warn">Nouveau${unk.length>1?"x":""} code${unk.length>1?"s":""}&nbsp;:
       ${unk.map(esc).join(", ")}. Ils seront ajoutés dans Réglages, à compléter avec leurs horaires.</p>`;
@@ -524,10 +576,11 @@ function saveCycle(){
   const startV = $("start").value;
   if(!startV || !pasteCells.length) return;
 
-  const unk = [...new Set(pasteCells)].filter(c => c && !ref[c]);
-  unk.forEach(c => ref[c] = {libelle:"", type:guessType(c), debut:"", fin:""});
+  const cells = pasteCells.map(c => c ? canon(c) : "");
+  const unk = [...new Set(cells)].filter(c => c && !ref[c]);
+  unk.forEach(c => ref[c] = newCode(c));
 
-  pasteCells.forEach((c,i)=>{ jours[iso(addDays(startV,i))] = c; });
+  cells.forEach((c,i)=>{ jours[iso(addDays(startV,i))] = c; });
   saveRef(); saveJours();
 
   $("line").value = "";
@@ -543,7 +596,7 @@ function saveCycle(){
 /* ================= Réglages : codes ================= */
 function renderCodes(){
   const box = $("codesArea");
-  const codesList = Object.keys(ref).filter(c=> c!=="Vacances");
+  const codesList = Object.keys(ref).filter(c=> c!=="Vacs");
   const pend = pendingCodes();
 
   const badge = $("reglagesBadge");
@@ -572,6 +625,13 @@ function renderCodes(){
       <td><input type="time" data-c="${esc(c)}" data-f="fin" value="${k.fin}"${off} aria-label="Heure de fin du code ${esc(c)}"></td>
       <td><button class="delcode" data-del="${esc(c)}" aria-label="Supprimer le code ${esc(c)}">✕</button></td>
     </tr>`;
+    if("debut2" in k){
+      h += `<tr>
+        <td class="code" style="font-weight:500;color:var(--ink-soft);padding-left:14px">↳ 2ᵉ créneau</td>
+        <td><input type="time" data-c="${esc(c)}" data-f="debut2" value="${k.debut2||""}" aria-label="Début du 2e créneau de ${esc(c)}"></td>
+        <td><input type="time" data-c="${esc(c)}" data-f="fin2" value="${k.fin2||""}" aria-label="Fin du 2e créneau de ${esc(c)}"></td>
+        <td></td></tr>`;
+    }
   });
   box.innerHTML = h + "</tbody></table></div>";
 
@@ -607,24 +667,31 @@ function renderNext(){
   if(!keys.length){ box.innerHTML = ""; return; }
 
   const tk = todayKey(), now = new Date();
+  /* le réveil le plus proche dans le futur, tous jours et tous créneaux confondus
+     (un créneau à 00:00 réveille la veille au soir) */
+  let best = null;
   for(const key of keys){
-    if(key < tk) continue;
     const code = jours[key];
-    const dt = dateOfKey(key);
     const k = ref[code];
-    if(!k || (!k.debut && !NOALARM(k.type))) continue;   /* pas d'horaire : signalé ailleurs */
-    if(NOALARM(k.type)){
-      if(key===tk) continue;
-      box.innerHTML = `<div class="next rest"><div class="lbl">Prochain jour</div>
-        <div class="hour">${TYPES[k.type].lbl}</div>
-        <div class="det">${fmtLong(dt)} · pas de réveil</div></div>`;
-      return;
+    if(!k || NOALARM(k.type)) continue;
+    const dt = dateOfKey(key);
+    for(const s of segsOf(k)){
+      const w = minusMinutes(dt, s.debut, prefs.lead);
+      if(w > now && (!best || w < best.w)) best = {w, code, debut:s.debut};
     }
-    const w = minusMinutes(dt, k.debut, prefs.lead);
-    if(w < now) continue;                                 /* réveil déjà passé aujourd'hui */
+  }
+  if(best){
     box.innerHTML = `<div class="next"><div class="lbl">Prochain réveil</div>
-      <div class="hour">${pad(w.getHours())}:${pad(w.getMinutes())}</div>
-      <div class="det">${fmtLong(w)} · poste ${esc(code)} à ${k.debut}</div></div>`;
+      <div class="hour">${pad(best.w.getHours())}:${pad(best.w.getMinutes())}</div>
+      <div class="det">${fmtLong(best.w)} · poste ${esc(best.code)} à ${best.debut}</div></div>`;
+    return;
+  }
+  /* pas de réveil à venir : montrer le prochain jour de repos/vacances, sinon rien */
+  const nk = keys.find(k => k >= tk);
+  if(nk && ref[jours[nk]] && NOALARM(ref[jours[nk]].type)){
+    box.innerHTML = `<div class="next rest"><div class="lbl">Prochain jour</div>
+      <div class="hour">${TYPES[ref[jours[nk]].type].lbl}</div>
+      <div class="det">${fmtLong(dateOfKey(nk))} · pas de réveil</div></div>`;
     return;
   }
   box.innerHTML = `<div class="next rest"><div class="lbl">Prochain réveil</div>
@@ -664,7 +731,7 @@ function gridHtml(k0, k1){
       let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
       if(st==="inconnu") cls += " vide";
       const bg = type ? `background:${TYPES[type].c}` : "";
-      const hr = (st==="ok") ? `<small>${k.debut}</small>${k.fin && k.fin!==k.debut ? `<small>${k.fin}</small>` : ""}` : "";
+      const hr = (st==="ok") ? segsOf(k).map(s=>`<small>${s.debut}${s.fin&&s.fin!==s.debut?"–"+s.fin:""}</small>`).join("") : "";
       const mark = (st==="sansheure" || st==="inconnu") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
       const titles = {inconnu:"code inconnu", sansheure:"horaire manquant"};
       const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "") + " — appuie pour modifier";
@@ -694,9 +761,12 @@ function listHtml(k0, k1){
     else if(st==="repos" || st==="vacances") det = TYPES[k.type].lbl;
     else if(st==="sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
     else{
-      det = `${TYPES[k.type].lbl} · ${k.debut}–${k.fin || k.debut}`;
-      const w = minusMinutes(dt, k.debut, prefs.lead);
-      lever = `<span class="lever">${iso(w)!==key ? "<small>veille</small> " : ""}${pad(w.getHours())}:${pad(w.getMinutes())}</span>`;
+      const segs = segsOf(k);
+      det = `${TYPES[k.type].lbl} · ${segs.map(s=>`${s.debut}–${s.fin}`).join(" · ")}`;
+      lever = `<span class="lever">` + segs.map(s=>{
+        const w = minusMinutes(dt, s.debut, prefs.lead);
+        return `${iso(w)!==key ? "<small>veille</small> " : ""}${pad(w.getHours())}:${pad(w.getMinutes())}`;
+      }).join(" · ") + `</span>`;
     }
     h += `<div class="${cls}" data-key="${key}"><span class="ld">${fmtShort(dt)}</span>
       <span class="chip" style="background:${chipBg}">${esc(c||"")||"·"}</span>
@@ -774,7 +844,7 @@ function openDayEditor(key){
   const dt = dateOfKey(key);
   /* liste de tous les codes possibles : la palette standard + ceux déjà utilisés,
      dédupliqués, sans le code réservé « Vacances » (bouton dédié) */
-  const codesList = [...new Set([...KNOWN_CODES, ...Object.keys(ref)])].filter(c=> c!=="Vacances");
+  const codesList = [...new Set([...KNOWN_CODES, ...Object.keys(ref)])].filter(c=> c!=="Vacs");
 
   const ov = document.createElement("div");
   ov.className = "sheet-ov";
@@ -791,7 +861,7 @@ function openDayEditor(key){
     <p class="sheet-h">${fmtLong(dt).replace(/^./,x=>x.toUpperCase())}</p>
     <div class="daygrid">
       ${codesList.map(choix).join("")}
-      <button class="daychoice" data-set="Vacances"><span class="chip" style="background:var(--vacances)">V</span><span>Vacances</span></button>
+      <button class="daychoice" data-set="Vacs"><span class="chip" style="background:var(--vacances)">V</span><span>Vacs</span></button>
       <button class="daychoice" data-set=""><span class="chip" style="background:var(--rule);color:var(--ink-soft)">·</span><span>Vide (à remplir)</span></button>
     </div>
     <div class="btns" style="justify-content:space-between;margin-top:14px">
@@ -813,8 +883,8 @@ function openDayEditor(key){
   ov.querySelectorAll("[data-set]").forEach(b=>
     b.addEventListener("click", ()=>{
       const c = b.dataset.set;
-      if(c==="Vacances" && !ref["Vacances"]){ ref["Vacances"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
-      else if(c && !ref[c]){ ref[c] = {libelle:"", type:guessType(c), debut:"", fin:""}; saveRef(); }
+      if(c==="Vacs" && !ref["Vacs"]){ ref["Vacs"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
+      else if(c && !ref[c]){ ref[c] = newCode(c); saveRef(); }
       jours[key] = c;
       saveJours();
       refreshSel();
@@ -887,20 +957,22 @@ function buildIcs(k0, k1){
     const c = jours[key];
     const k = ref[c];
     const dt = dateOfKey(key);
-    const fin = k.fin || k.debut;
-    const [dh,dm] = k.debut.split(":");
-    const [fh,fm] = fin.split(":");
-    const end = new Date(dt);
-    if(fin <= k.debut) end.setDate(end.getDate()+1);   /* poste de nuit : fin le lendemain */
-    out.push("BEGIN:VEVENT",
-      "UID:" + key + "@reveils-cycle",
-      "DTSTAMP:" + stamp,
-      "DTSTART:" + key + "T" + dh + dm + "00",
-      "DTEND:"   + iso(end) + "T" + fh + fm + "00",
-      "SUMMARY:" + escIcs(c),
-      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Debout",
-      "TRIGGER:-PT" + (prefs.lead||0) + "M","END:VALARM","END:VEVENT");
-    s.ok++;
+    segsOf(k).forEach((seg,si)=>{
+      const fin = seg.fin || seg.debut;
+      const [dh,dm] = seg.debut.split(":");
+      const [fh,fm] = fin.split(":");
+      const end = new Date(dt);
+      if(fin <= seg.debut) end.setDate(end.getDate()+1);   /* fin le lendemain (nuit / minuit) */
+      out.push("BEGIN:VEVENT",
+        "UID:" + key + (si?"-"+si:"") + "@reveils-cycle",
+        "DTSTAMP:" + stamp,
+        "DTSTART:" + key + "T" + dh + dm + "00",
+        "DTEND:"   + iso(end) + "T" + fh + fm + "00",
+        "SUMMARY:" + escIcs(c),
+        "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Debout",
+        "TRIGGER:-PT" + (prefs.lead||0) + "M","END:VALARM","END:VEVENT");
+      s.ok++;
+    });
   });
   out.push("END:VCALENDAR");
   return {txt: out.join("\r\n"), s};
@@ -974,6 +1046,7 @@ $("impJson").addEventListener("change", async e=>{
       [...s.plannings].sort((a,b)=>(a.creeLe||0)-(b.creeLe||0)).forEach(p=>
         (p.codes||[]).forEach((c,i)=>{ jours[iso(addDays(p.dateDebut,i))] = c; }));
     if(s.prefs) prefs = Object.assign({lead:45, calName:"Travail"}, s.prefs);
+    migrate();
     saveRef(); saveJours(); savePrefs();
     $("lead").value = prefs.lead;
     $("calName").value = prefs.calName;
@@ -1005,6 +1078,7 @@ function applyRemote(s){
   applying = true;
   ref   = s.codes || {};
   jours = s.jours || {};
+  migrate();
   pruneJours(jours);
   prefs = Object.assign({lead:45, calName:"Travail"}, s.prefs || {});
   saveRef(); saveJours(); savePrefs();
@@ -1195,9 +1269,11 @@ $("calName").addEventListener("change", ()=>{
     }catch(e){} }
   }
 
-  /* ménage silencieux : ne passe pas par saveJours pour ne pas compter comme
-     une modification locale (bump) — chaque appareil purge la même chose */
-  if(pruneJours(jours)) store.set("cycle:jours", wrap(jours));
+  /* mise en conformité + ménage silencieux : on écrit directement (sans bump)
+     pour ne pas compter comme une modification locale — chaque appareil fait pareil */
+  const changed = migrate();
+  if(changed) store.set("cycle:codes", wrap(ref));
+  if(pruneJours(jours) || changed) store.set("cycle:jours", wrap(jours));
 
   /* date de début proposée : lendemain du dernier jour planifié, sinon aujourd'hui */
   const keys = planKeys();
