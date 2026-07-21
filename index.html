@@ -356,9 +356,10 @@ const DOW = ["L","M","Me","J","V","S","D"];
    significative (A = a, M = m…) : ces orthographes sont les formes canoniques. */
 const KNOWN_CODES = ["M","A","N","Ne","Nf","Nwe","J","B","Bp","Bp1","R","Rh"];
 /* horaires par défaut à la création d'un code. « N » est un double poste :
-   deux créneaux dans la même journée (00:00–06:30 et 19:30–00:00). */
+   deux créneaux dans la même journée. Le 1er (00:00–06:30) est la fin d'une nuit
+   déjà en cours — pas de réveil (déjà sonné la veille) ; seul le 2e (19:30) sonne. */
 const CODE_DEFAULTS = {
-  "N": {type:"nuit", debut:"00:00", fin:"06:30", debut2:"19:30", fin2:"00:00"}
+  "N": {type:"nuit", debut:"00:00", fin:"06:30", debut2:"19:30", fin2:"00:00", noReveil1:true}
 };
 
 let ref = {};        // référentiel : code -> {libelle, type, debut, fin}
@@ -445,11 +446,12 @@ function newCode(c){
            : {libelle:"", type:guessType(c), debut:"", fin:""};
 }
 
-/* Créneaux de travail d'un code (1, ou 2 pour un double poste comme N). */
+/* Créneaux de travail d'un code (1, ou 2 pour un double poste comme N).
+   `alarm` = ce créneau déclenche un réveil (le 1er créneau de N n'en déclenche pas). */
 function segsOf(k){
   const s = [];
-  if(k.debut)  s.push({debut:k.debut,  fin:k.fin  || k.debut});
-  if(k.debut2) s.push({debut:k.debut2, fin:k.fin2 || k.debut2});
+  if(k.debut)  s.push({debut:k.debut,  fin:k.fin  || k.debut,  alarm: !k.noReveil1});
+  if(k.debut2) s.push({debut:k.debut2, fin:k.fin2 || k.debut2, alarm: !k.noReveil2});
   return s;
 }
 
@@ -471,6 +473,8 @@ function migrate(){
     if(cv !== v){ jours[k] = cv; ch = true; }
   });
   if(ref["N"] && !("debut2" in ref["N"])){ Object.assign(ref["N"], CODE_DEFAULTS["N"]); ch = true; }
+  /* 1er créneau de N sans réveil (données antérieures à cette règle) */
+  if(ref["N"] && ref["N"].debut2 && !("noReveil1" in ref["N"])){ ref["N"].noReveil1 = true; ch = true; }
   return ch;
 }
 
@@ -620,7 +624,7 @@ function renderCodes(){
     const k = ref[c];
     const off = NOALARM(k.type) ? " disabled" : "";
     h += `<tr${pend.includes(c) ? ' class="pend"' : ''}>
-      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}${NOALARM(k.type) ? ` <span style="font-weight:500;color:var(--ink-soft)">${TYPES[k.type].lbl.toLowerCase()}</span>` : ''}</td>
+      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}${NOALARM(k.type) ? ` <span style="font-weight:500;color:var(--ink-soft)">${TYPES[k.type].lbl.toLowerCase()}</span>` : ''}${k.noReveil1 ? ` <span style="font-weight:500;color:var(--ink-soft)">· 1er créneau sans réveil</span>` : ''}</td>
       <td><input type="time" data-c="${esc(c)}" data-f="debut" value="${k.debut}"${off} aria-label="Heure de début du code ${esc(c)}"></td>
       <td><input type="time" data-c="${esc(c)}" data-f="fin" value="${k.fin}"${off} aria-label="Heure de fin du code ${esc(c)}"></td>
       <td><button class="delcode" data-del="${esc(c)}" aria-label="Supprimer le code ${esc(c)}">✕</button></td>
@@ -676,6 +680,7 @@ function renderNext(){
     if(!k || NOALARM(k.type)) continue;
     const dt = dateOfKey(key);
     for(const s of segsOf(k)){
+      if(!s.alarm) continue;                               /* créneau sans réveil (1er créneau de N) */
       const w = minusMinutes(dt, s.debut, prefs.lead);
       if(w > now && (!best || w < best.w)) best = {w, code, debut:s.debut};
     }
@@ -762,11 +767,12 @@ function listHtml(k0, k1){
     else if(st==="sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
     else{
       const segs = segsOf(k);
-      det = `${TYPES[k.type].lbl} · ${segs.map(s=>`${s.debut}–${s.fin}`).join(" · ")}`;
-      lever = `<span class="lever">` + segs.map(s=>{
+      det = `${TYPES[k.type].lbl} · ${segs.map(s=>`${s.debut}–${s.fin}${s.alarm?"":" (sans réveil)"}`).join(" · ")}`;
+      const levers = segs.filter(s=>s.alarm).map(s=>{
         const w = minusMinutes(dt, s.debut, prefs.lead);
         return `${iso(w)!==key ? "<small>veille</small> " : ""}${pad(w.getHours())}:${pad(w.getMinutes())}`;
-      }).join(" · ") + `</span>`;
+      });
+      lever = levers.length ? `<span class="lever">${levers.join(" · ")}</span>` : "";
     }
     h += `<div class="${cls}" data-key="${key}"><span class="ld">${fmtShort(dt)}</span>
       <span class="chip" style="background:${chipBg}">${esc(c||"")||"·"}</span>
@@ -963,15 +969,19 @@ function buildIcs(k0, k1){
       const [fh,fm] = fin.split(":");
       const end = new Date(dt);
       if(fin <= seg.debut) end.setDate(end.getDate()+1);   /* fin le lendemain (nuit / minuit) */
-      out.push("BEGIN:VEVENT",
+      const ev = ["BEGIN:VEVENT",
         "UID:" + key + (si?"-"+si:"") + "@reveils-cycle",
         "DTSTAMP:" + stamp,
         "DTSTART:" + key + "T" + dh + dm + "00",
         "DTEND:"   + iso(end) + "T" + fh + fm + "00",
-        "SUMMARY:" + escIcs(c),
-        "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Debout",
-        "TRIGGER:-PT" + (prefs.lead||0) + "M","END:VALARM","END:VEVENT");
-      s.ok++;
+        "SUMMARY:" + escIcs(c)];
+      if(seg.alarm){                                        /* réveil seulement sur les créneaux qui sonnent */
+        ev.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Debout",
+          "TRIGGER:-PT" + (prefs.lead||0) + "M","END:VALARM");
+        s.ok++;
+      }
+      ev.push("END:VEVENT");
+      out.push(...ev);
     });
   });
   out.push("END:VCALENDAR");
