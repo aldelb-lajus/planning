@@ -21,6 +21,7 @@
     --jour:#5C7A2E;
     --repos:#9AA6B2;
     --autre:#6B5E8C;
+    --vacances:#1C93A0;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--ink);
@@ -98,6 +99,22 @@
   .cell.past{opacity:.55}
   .cell.today{box-shadow:inset 0 0 0 2.5px var(--ink)}
   .cell.off{background:transparent;border:1px dashed var(--rule);color:var(--ink-soft)}
+  .cell[data-key]{cursor:pointer}
+  .drow[data-key]{cursor:pointer}
+  @media (hover:hover){ .cell[data-key]:hover{filter:brightness(1.06)} .drow[data-key]:hover{background:#F3F6F8} }
+
+  /* --- feuille d'édition d'un jour --- */
+  .sheet-ov{position:fixed;inset:0;z-index:50;background:rgba(17,26,34,.45);
+    display:flex;align-items:flex-end;justify-content:center;padding:0}
+  .sheet{background:var(--card);width:100%;max-width:760px;border-radius:16px 16px 0 0;
+    padding:18px 16px calc(20px + env(safe-area-inset-bottom));max-height:85vh;overflow-y:auto}
+  .sheet-h{font-size:16px;font-weight:800;margin:0 0 12px}
+  .daygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .daychoice{display:flex;align-items:center;gap:8px;justify-content:flex-start;
+    text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--rule);
+    font-weight:600;font-size:14px;padding:10px 12px;min-height:48px}
+  .daychoice.sel{border-color:var(--act);box-shadow:inset 0 0 0 1px var(--act)}
+  .daychoice .chip{min-width:30px}
   .mois{grid-column:1/-1;font-size:11px;font-weight:800;text-transform:uppercase;
     letter-spacing:.08em;color:var(--ink-soft);padding:12px 0 2px}
   .lmois{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
@@ -195,7 +212,9 @@
         <button class="ghost" id="viewList" aria-pressed="false">Liste</button>
       </div>
       <div id="planView"></div>
+      <p class="hint" id="planTip" style="margin-top:12px">Appuie sur un jour pour le modifier à la main.</p>
       <div class="btns">
+        <button class="ghost" id="addWeek">+ Ajouter une semaine</button>
         <button class="ghost danger" id="clearPlan">Effacer le planning</button>
       </div>
     </div>
@@ -327,9 +346,14 @@ const TYPES = {
   nuit: {lbl:"Nuit",       c:"var(--nuit)"},
   jour: {lbl:"Journée",    c:"var(--jour)"},
   repos:{lbl:"Repos",      c:"var(--repos)"},
+  vacances:{lbl:"Vacances", c:"var(--vacances)"},
   autre:{lbl:"Autre",      c:"var(--autre)"}
 };
+/* jours sans réveil : repos et vacances (informatifs, jamais d'alarme) */
+const NOALARM = t => t==="repos" || t==="vacances";
 const DOW = ["L","M","Me","J","V","S","D"];
+/* palette de codes proposée dans l'éditeur d'un jour (ordre par type) */
+const KNOWN_CODES = ["M","m","A","a","N","Ne","Nf","Nwe","J","B","Bp","Bp1","R","Rh"];
 
 let ref = {};        // référentiel : code -> {libelle, type, debut, fin}
 let jours = {};      // LE planning : "AAAAMMJJ" -> code (un seul, réécrit à chaque import)
@@ -431,10 +455,10 @@ function pruneJours(o){
   return ch;
 }
 const pendingCodes = () =>
-  Object.keys(ref).filter(c => ref[c].type!=="repos" && !ref[c].debut);
+  Object.keys(ref).filter(c => !NOALARM(ref[c].type) && !ref[c].debut);
 
-/* Statut d'un jour : "off" (rien de planifié), "vide" (cellule vide importée),
-   "inconnu", "repos", "sansheure", "ok". */
+/* Statut d'un jour : "off" (rien de planifié), "vide" (jour ajouté à remplir),
+   "inconnu", "repos", "vacances", "sansheure", "ok". */
 function statusOf(key){
   if(!(key in jours)) return "off";
   const c = jours[key];
@@ -442,6 +466,7 @@ function statusOf(key){
   const k = ref[c];
   if(!k) return "inconnu";
   if(k.type === "repos") return "repos";
+  if(k.type === "vacances") return "vacances";
   if(!k.debut) return "sansheure";
   return "ok";
 }
@@ -518,7 +543,7 @@ function saveCycle(){
 /* ================= Réglages : codes ================= */
 function renderCodes(){
   const box = $("codesArea");
-  const codesList = Object.keys(ref);
+  const codesList = Object.keys(ref).filter(c=> c!=="Vacances");
   const pend = pendingCodes();
 
   const badge = $("reglagesBadge");
@@ -540,9 +565,9 @@ function renderCodes(){
   let h = '<div class="tscroll"><table><thead><tr><th>Code</th><th>Début</th><th>Fin</th><th></th></tr></thead><tbody>';
   codesList.forEach(c=>{
     const k = ref[c];
-    const off = k.type==="repos" ? " disabled" : "";
+    const off = NOALARM(k.type) ? " disabled" : "";
     h += `<tr${pend.includes(c) ? ' class="pend"' : ''}>
-      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}${k.type==="repos" ? ' <span style="font-weight:500;color:var(--ink-soft)">repos</span>' : ''}</td>
+      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}${NOALARM(k.type) ? ` <span style="font-weight:500;color:var(--ink-soft)">${TYPES[k.type].lbl.toLowerCase()}</span>` : ''}</td>
       <td><input type="time" data-c="${esc(c)}" data-f="debut" value="${k.debut}"${off} aria-label="Heure de début du code ${esc(c)}"></td>
       <td><input type="time" data-c="${esc(c)}" data-f="fin" value="${k.fin}"${off} aria-label="Heure de fin du code ${esc(c)}"></td>
       <td><button class="delcode" data-del="${esc(c)}" aria-label="Supprimer le code ${esc(c)}">✕</button></td>
@@ -587,11 +612,11 @@ function renderNext(){
     const code = jours[key];
     const dt = dateOfKey(key);
     const k = ref[code];
-    if(!k || (!k.debut && k.type!=="repos")) continue;   /* pas d'horaire : signalé ailleurs */
-    if(k.type==="repos"){
+    if(!k || (!k.debut && !NOALARM(k.type))) continue;   /* pas d'horaire : signalé ailleurs */
+    if(NOALARM(k.type)){
       if(key===tk) continue;
       box.innerHTML = `<div class="next rest"><div class="lbl">Prochain jour</div>
-        <div class="hour">Repos</div>
+        <div class="hour">${TYPES[k.type].lbl}</div>
         <div class="det">${fmtLong(dt)} · pas de réveil</div></div>`;
       return;
     }
@@ -629,18 +654,21 @@ function gridHtml(k0, k1){
       const key = iso(dt);
       const st = statusOf(key);
       const dnum = `<span class="dnum">${dt.getDate()}</span>`;
-      if(st==="off"){ h += `<div class="cell off" title="${dt.toLocaleDateString("fr-FR")} — non planifié">${dnum}</div>`; continue; }
+      if(st==="off" || st==="vide"){
+        h += `<div class="cell off" data-key="${key}" title="${dt.toLocaleDateString("fr-FR")} — appuie pour remplir">${dnum}</div>`;
+        continue;
+      }
       const c = jours[key];
       const k = ref[c];
-      const type = (st==="vide" || st==="inconnu") ? null : k.type;
+      const type = st==="inconnu" ? null : k.type;
       let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
-      if(st==="vide" || st==="inconnu") cls += " vide";
+      if(st==="inconnu") cls += " vide";
       const bg = type ? `background:${TYPES[type].c}` : "";
       const hr = (st==="ok") ? `<small>${k.debut}</small>${k.fin && k.fin!==k.debut ? `<small>${k.fin}</small>` : ""}` : "";
-      const mark = (st==="sansheure" || st==="inconnu" || st==="vide") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
-      const titles = {vide:"cellule vide", inconnu:"code inconnu", sansheure:"horaire manquant"};
-      const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "");
-      h += `<div class="${cls}" style="${bg}" title="${title}">${dnum}${esc(c)||"·"}${hr}${mark}</div>`;
+      const mark = (st==="sansheure" || st==="inconnu") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
+      const titles = {inconnu:"code inconnu", sansheure:"horaire manquant"};
+      const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "") + " — appuie pour modifier";
+      h += `<div class="${cls}" data-key="${key}" style="${bg}" title="${title}">${dnum}${esc(c)||"·"}${hr}${mark}</div>`;
     }
   }
   return h + "</div>";
@@ -661,17 +689,16 @@ function listHtml(k0, k1){
     let cls = "drow" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
     const chipBg = (st==="off" || st==="vide" || st==="inconnu") ? "var(--rule);color:var(--ink-soft)" : TYPES[k.type].c;
     let det = "", lever = "";
-    if(st==="off")             det = `<span style="color:var(--ink-soft)">non planifié</span>`;
-    else if(st==="vide")       det = `<span class="warn-t">cellule vide — pas de réveil</span>`;
+    if(st==="off" || st==="vide") det = `<span style="color:var(--ink-soft)">à remplir — appuie</span>`;
     else if(st==="inconnu")    det = `<span class="warn-t">code inconnu — pas de réveil</span>`;
-    else if(st==="repos")      det = TYPES.repos.lbl;
+    else if(st==="repos" || st==="vacances") det = TYPES[k.type].lbl;
     else if(st==="sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
     else{
       det = `${TYPES[k.type].lbl} · ${k.debut}–${k.fin || k.debut}`;
       const w = minusMinutes(dt, k.debut, prefs.lead);
       lever = `<span class="lever">${iso(w)!==key ? "<small>veille</small> " : ""}${pad(w.getHours())}:${pad(w.getMinutes())}</span>`;
     }
-    h += `<div class="${cls}"><span class="ld">${fmtShort(dt)}</span>
+    h += `<div class="${cls}" data-key="${key}"><span class="ld">${fmtShort(dt)}</span>
       <span class="chip" style="background:${chipBg}">${esc(c||"")||"·"}</span>
       <span class="det">${det}</span>${lever}</div>`;
   }
@@ -701,13 +728,20 @@ function renderPlanning(){
     · ${visibles.length} jours`
     + (masques ? ` <span style="color:var(--ink-soft)">· ${masques} jour${masques>1?"s":""} passé${masques>1?"s":""} masqué${masques>1?"s":""}</span>` : "");
 
-  const miss = visibles.filter(k => ["vide","inconnu","sansheure"].includes(statusOf(k))).length;
-  notes.innerHTML = miss ? `<p class="msg warn">${miss} jour${miss>1?"s":""} sans horaire —
-    complète les codes dans Réglages, sinon pas de réveil ces jours-là.</p>` : "";
+  const miss = visibles.filter(k => ["inconnu","sansheure"].includes(statusOf(k))).length;
+  const vides = visibles.filter(k => statusOf(k)==="vide").length;
+  notes.innerHTML =
+    (miss ? `<p class="msg warn">${miss} jour${miss>1?"s":""} sans horaire —
+      complète les codes dans Réglages, sinon pas de réveil ces jours-là.</p>` : "")
+    + (vides ? `<p class="msg">${vides} jour${vides>1?"s":""} à remplir —
+      appuie dessus pour choisir le poste.</p>` : "");
 
   $("viewGrid").setAttribute("aria-pressed", planMode==="grid");
   $("viewList").setAttribute("aria-pressed", planMode==="list");
   view.innerHTML = planMode==="list" ? listHtml(kStart, k1) : gridHtml(kStart, k1);
+
+  view.querySelectorAll("[data-key]").forEach(el=>
+    el.addEventListener("click", ()=> openDayEditor(el.dataset.key)));
 }
 
 $("viewGrid").addEventListener("click", ()=>{ planMode = "grid"; renderPlanning(); });
@@ -717,6 +751,78 @@ $("clearPlan").addEventListener("click", ()=>{
   if(!confirm("Effacer tout le planning ?\nLes codes et leurs horaires sont conservés. Les événements déjà envoyés au calendrier ne seront pas retirés.")) return;
   jours = {}; saveJours(); renderAll();
 });
+
+/* Ajouter une semaine : 7 jours vides après le dernier jour planifié (ou à partir
+   du lundi de cette semaine si le planning est vide). Réappuyer en ajoute d'autres. */
+$("addWeek").addEventListener("click", ()=>{
+  const keys = planKeys();
+  let start;
+  if(keys.length){
+    start = dateOfKey(keys[keys.length-1]); start.setDate(start.getDate()+1);
+  }else{
+    start = new Date(); start.setDate(start.getDate() - (start.getDay()+6)%7);
+  }
+  for(let i=0;i<7;i++){ const k = iso(new Date(start.getFullYear(), start.getMonth(), start.getDate()+i)); if(!(k in jours)) jours[k] = ""; }
+  saveJours();
+  const nk = planKeys();
+  $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
+  renderAll();
+});
+
+/* ---------- éditeur d'un jour (clic sur une case) ---------- */
+function openDayEditor(key){
+  const dt = dateOfKey(key);
+  /* liste de tous les codes possibles : la palette standard + ceux déjà utilisés,
+     dédupliqués, sans le code réservé « Vacances » (bouton dédié) */
+  const codesList = [...new Set([...KNOWN_CODES, ...Object.keys(ref)])].filter(c=> c!=="Vacances");
+
+  const ov = document.createElement("div");
+  ov.className = "sheet-ov";
+  const choix = c => {
+    const type = ref[c] ? ref[c].type : guessType(c);
+    const k = ref[c];
+    const info = NOALARM(type) ? TYPES[type].lbl
+      : (k && k.debut ? k.debut + (k.fin?"–"+k.fin:"") : "horaire à régler");
+    return `<button class="daychoice" data-set="${esc(c)}">
+      <span class="chip" style="background:${TYPES[type].c}">${esc(c)}</span>
+      <span>${info}</span></button>`;
+  };
+  ov.innerHTML = `<div class="sheet" role="dialog" aria-label="Modifier le jour">
+    <p class="sheet-h">${fmtLong(dt).replace(/^./,x=>x.toUpperCase())}</p>
+    <div class="daygrid">
+      ${codesList.map(choix).join("")}
+      <button class="daychoice" data-set="Vacances"><span class="chip" style="background:var(--vacances)">V</span><span>Vacances</span></button>
+      <button class="daychoice" data-set=""><span class="chip" style="background:var(--rule);color:var(--ink-soft)">·</span><span>Vide (à remplir)</span></button>
+    </div>
+    <div class="btns" style="justify-content:space-between;margin-top:14px">
+      <button class="ghost danger" data-remove="1">Retirer ce jour</button>
+      <button data-valider="1">Valider</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+
+  const close = ()=>{
+    const nk = planKeys();
+    if(nk.length) $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
+    ov.remove(); renderAll();
+  };
+  const refreshSel = ()=> ov.querySelectorAll("[data-set]").forEach(b=>
+    b.classList.toggle("sel", b.dataset.set === (jours[key] ?? " ")));
+
+  refreshSel();
+  ov.querySelectorAll("[data-set]").forEach(b=>
+    b.addEventListener("click", ()=>{
+      const c = b.dataset.set;
+      if(c==="Vacances" && !ref["Vacances"]){ ref["Vacances"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
+      else if(c && !ref[c]){ ref[c] = {libelle:"", type:guessType(c), debut:"", fin:""}; saveRef(); }
+      jours[key] = c;
+      saveJours();
+      refreshSel();
+    }));
+  ov.querySelector("[data-remove]").addEventListener("click", ()=>{ delete jours[key]; saveJours(); close(); });
+  ov.querySelector("[data-valider]").addEventListener("click", close);
+  ov.addEventListener("click", e=>{ if(e.target===ov) close(); });
+}
 
 /* ================= onglet Export ================= */
 function exportRange(){
@@ -775,7 +881,8 @@ function buildIcs(k0, k1){
   planKeys().forEach(key=>{
     if(key < k0 || key > k1) return;
     const st = statusOf(key);
-    if(st==="repos"){ s.repos++; return; }
+    if(st==="repos" || st==="vacances"){ s.repos++; return; }
+    if(st==="vide"){ return; }                         /* jour à remplir : ni exporté ni « ignoré » */
     if(st!=="ok"){ s.miss++; return; }
     const c = jours[key];
     const k = ref[c];
@@ -808,7 +915,7 @@ function doExport(versGoogle){
     return;
   }
   const parts = [`<strong>${s.ok} poste${s.ok>1?"s":""} exporté${s.ok>1?"s":""}</strong>`];
-  if(s.repos) parts.push(`${s.repos} jour${s.repos>1?"s":""} de repos`);
+  if(s.repos) parts.push(`${s.repos} jour${s.repos>1?"s":""} sans réveil (repos, vacances)`);
   if(s.miss)  parts.push(`<strong>${s.miss} jour${s.miss>1?"s":""} ignoré${s.miss>1?"s":""} faute d'horaire</strong>`);
   let em = `<p class="msg ${s.miss ? "warn" : "ok"}">${parts.join(" · ")}.</p>`;
 
