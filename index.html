@@ -172,6 +172,16 @@
     .drow{min-height:auto;padding:3px 4px;font-size:11px;break-inside:avoid}
     .cell.past,.drow.past{opacity:.55}
   }
+  /* --- téléphone : la grille reste un aperçu couleur + code, les heures vont
+     dans la vue Liste (illisibles dans un carré de 44 px) --- */
+  .planhint-grid{display:none;font-size:12px;color:var(--ink-soft);margin:8px 0 0}
+  @media (max-width:520px){
+    .grid{gap:2px}
+    .cell{font-size:13.5px}
+    .cell small{display:none}
+    .cell .dnum{font-size:9px;opacity:.85}
+    .planhint-grid{display:block}
+  }
   @media (prefers-reduced-motion:no-preference){.cell{transition:opacity .2s}}
 </style>
 </head>
@@ -212,6 +222,7 @@
         <button class="ghost" id="viewList" aria-pressed="false">Liste</button>
       </div>
       <div id="planView"></div>
+      <p class="planhint-grid" id="gridHint">👉 Heures détaillées dans la vue <strong>Liste</strong>.</p>
       <p class="hint" id="planTip" style="margin-top:12px">Appuie sur un jour pour le modifier à la main.</p>
       <div class="btns">
         <button class="ghost" id="addWeek">+ Ajouter une semaine</button>
@@ -815,6 +826,7 @@ function renderPlanning(){
   $("viewGrid").setAttribute("aria-pressed", planMode==="grid");
   $("viewList").setAttribute("aria-pressed", planMode==="list");
   view.innerHTML = planMode==="list" ? listHtml(kStart, k1) : gridHtml(kStart, k1);
+  $("gridHint").style.display = planMode==="list" ? "none" : "";  /* visible seulement en grille (et mobile via CSS) */
 
   view.querySelectorAll("[data-key]").forEach(el=>
     el.addEventListener("click", ()=> openDayEditor(el.dataset.key)));
