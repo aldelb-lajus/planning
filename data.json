@@ -1,6 +1,6 @@
 {
  "v": 3,
- "majLe": 1784632362623,
+ "majLe": 1784632375994,
  "codes": {
   "Bp": {
    "libelle": "",
@@ -206,7 +206,7 @@
   "20261108": "Rh"
  },
  "prefs": {
-  "lead": 50,
+  "lead": 60,
   "calName": "Travail"
  }
 }
