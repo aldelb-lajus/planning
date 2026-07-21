@@ -370,7 +370,8 @@ const KNOWN_CODES = ["M","A","N","Ne","Nf","Nwe","J","B","Bp","Bp1","R","Rh"];
    deux créneaux dans la même journée. Le 1er (00:00–06:30) est la fin d'une nuit
    déjà en cours — pas de réveil (déjà sonné la veille) ; seul le 2e (19:30) sonne. */
 const CODE_DEFAULTS = {
-  "N": {type:"nuit", debut:"00:00", fin:"06:30", debut2:"19:30", fin2:"00:00", noReveil1:true}
+  "N":  {type:"nuit", debut:"00:00", fin:"06:30", debut2:"19:30", fin2:"00:00", noReveil1:true},
+  "Nf": {type:"nuit", debut:"00:00", fin:"06:30", noReveil1:true}   /* nuit fin : suite de la nuit de la veille, pas de réveil */
 };
 
 let ref = {};        // référentiel : code -> {libelle, type, debut, fin}
@@ -486,6 +487,8 @@ function migrate(){
   if(ref["N"] && !("debut2" in ref["N"])){ Object.assign(ref["N"], CODE_DEFAULTS["N"]); ch = true; }
   /* 1er créneau de N sans réveil (données antérieures à cette règle) */
   if(ref["N"] && ref["N"].debut2 && !("noReveil1" in ref["N"])){ ref["N"].noReveil1 = true; ch = true; }
+  /* Nf (nuit fin) : suite de la nuit de la veille, pas de réveil */
+  if(ref["Nf"] && !("noReveil1" in ref["Nf"])){ ref["Nf"].noReveil1 = true; ch = true; }
   return ch;
 }
 
@@ -880,36 +883,48 @@ function openDayEditor(key){
     <div class="daygrid">
       ${codesList.map(choix).join("")}
       <button class="daychoice" data-set="Vacs"><span class="chip" style="background:var(--vacances)">V</span><span>Vacs</span></button>
+      <button class="daychoice" data-set="__REMOVE__"><span class="chip" style="background:var(--rule);color:var(--ink-soft)">✕</span><span>Retirer du planning</span></button>
       <button class="daychoice" data-set=""><span class="chip" style="background:var(--rule);color:var(--ink-soft)">·</span><span>Vide (à remplir)</span></button>
     </div>
-    <div class="btns" style="justify-content:space-between;margin-top:14px">
-      <button class="ghost danger" data-remove="1">Retirer ce jour</button>
+    <div class="btns" style="justify-content:flex-end;margin-top:14px">
+      <button class="ghost" data-annuler="1">Annuler</button>
       <button data-valider="1">Valider</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
 
-  const close = ()=>{
-    const nk = planKeys();
-    if(nk.length) $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
-    ov.remove(); renderAll();
-  };
+  /* etat d'origine et selection en attente : rien n'est ecrit avant Valider */
+  const origine = (key in jours) ? jours[key] : "__OFF__";
+  let pending = origine;
+
+  const close = ()=> ov.remove();
   const refreshSel = ()=> ov.querySelectorAll("[data-set]").forEach(b=>
-    b.classList.toggle("sel", b.dataset.set === (jours[key] ?? " ")));
+    b.classList.toggle("sel", b.dataset.set === (pending ?? " ")));
 
   refreshSel();
   ov.querySelectorAll("[data-set]").forEach(b=>
-    b.addEventListener("click", ()=>{
-      const c = b.dataset.set;
-      if(c==="Vacs" && !ref["Vacs"]){ ref["Vacs"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
-      else if(c && !ref[c]){ ref[c] = newCode(c); saveRef(); }
-      jours[key] = c;
+    b.addEventListener("click", ()=>{ pending = b.dataset.set; refreshSel(); }));
+
+  ov.querySelector("[data-annuler]").addEventListener("click", close);
+  ov.addEventListener("click", e=>{ if(e.target===ov) close(); });   /* tap hors de la feuille = annuler */
+
+  ov.querySelector("[data-valider]").addEventListener("click", ()=>{
+    if(pending !== origine){
+      if(pending === "__REMOVE__"){
+        delete jours[key];
+      }else{
+        const c = pending;
+        if(c==="Vacs" && !ref["Vacs"]){ ref["Vacs"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
+        else if(c && !ref[c]){ ref[c] = newCode(c); saveRef(); }
+        jours[key] = c;
+      }
       saveJours();
-      refreshSel();
-    }));
-  ov.querySelector("[data-remove]").addEventListener("click", ()=>{ delete jours[key]; saveJours(); close(); });
-  ov.querySelector("[data-valider]").addEventListener("click", close);
-  ov.addEventListener("click", e=>{ if(e.target===ov) close(); });
+      const nk = planKeys();
+      if(nk.length) $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
+      renderAll();
+    }
+    close();
+  });
 }
 
 /* ================= onglet Export ================= */
@@ -965,7 +980,7 @@ function download(txt, name, mime){
 function buildIcs(k0, k1){
   const out = icsHead();
   const stamp = icsStamp();
-  const s = {ok:0, repos:0, miss:0};
+  const s = {ok:0, evts:0, repos:0, miss:0};
   planKeys().forEach(key=>{
     if(key < k0 || key > k1) return;
     const st = statusOf(key);
@@ -994,6 +1009,7 @@ function buildIcs(k0, k1){
       }
       ev.push("END:VEVENT");
       out.push(...ev);
+      s.evts++;
     });
   });
   out.push("END:VCALENDAR");
@@ -1004,11 +1020,11 @@ function doExport(versGoogle){
   const r = exportRange();
   if(!r){ $("exportMsg").innerHTML = `<p class="msg warn">Choisis une plage de dates valide.</p>`; return; }
   const {txt, s} = buildIcs(r.k0, r.k1);
-  if(!s.ok){
+  if(!s.evts){
     $("exportMsg").innerHTML = `<p class="msg warn">Aucun poste exploitable dans cette plage — vérifie les dates et les horaires dans Réglages.</p>`;
     return;
   }
-  const parts = [`<strong>${s.ok} poste${s.ok>1?"s":""} exporté${s.ok>1?"s":""}</strong>`];
+  const parts = [`<strong>${s.evts} poste${s.evts>1?"s":""} exporté${s.evts>1?"s":""}</strong> · ${s.ok} réveil${s.ok>1?"s":""}`];
   if(s.repos) parts.push(`${s.repos} jour${s.repos>1?"s":""} sans réveil (repos, vacances)`);
   if(s.miss)  parts.push(`<strong>${s.miss} jour${s.miss>1?"s":""} ignoré${s.miss>1?"s":""} faute d'horaire</strong>`);
   let em = `<p class="msg ${s.miss ? "warn" : "ok"}">${parts.join(" · ")}.</p>`;

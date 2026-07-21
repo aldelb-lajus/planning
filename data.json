@@ -1,6 +1,6 @@
 {
  "v": 3,
- "majLe": 1784620999000,
+ "majLe": 1784621500000,
  "codes": {
   "Bp": {
    "libelle": "",
@@ -36,7 +36,8 @@
    "libelle": "",
    "type": "nuit",
    "debut": "00:00",
-   "fin": "06:30"
+   "fin": "06:30",
+   "noReveil1": true
   },
   "M": {
    "libelle": "",
