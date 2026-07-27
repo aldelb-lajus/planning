@@ -4,199 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#175E5A">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%8F%B0%3C/text%3E%3C/svg%3E">
-<title>Réveils du cycle</title>
-<style>
-  :root{
-    --paper:#E7EBEF;
-    --card:#FFFFFF;
-    --ink:#111A22;
-    --ink-soft:#5A6976;
-    --rule:#C9D2DA;
-    --act:#175E5A;
-    --danger:#B3402A;
-    --matin:#DE9520;
-    --aprem:#B8496B;
-    --nuit:#2E4A8C;
-    --jour:#5C7A2E;
-    --repos:#9AA6B2;
-    --autre:#6B5E8C;
-    --vacances:#1C93A0;
-  }
-  *{box-sizing:border-box}
-  /* « hidden » doit gagner : plusieurs règles plus bas imposent un display
-     (flex, grid…) qui, sinon, laisse l'élément visible malgré l'attribut. */
-  [hidden]{display:none !important}
-  body{margin:0;background:var(--paper);color:var(--ink);
-    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
-    font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
-  .wrap{max-width:760px;margin:0 auto;padding:22px 16px 104px}
-
-  h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
-  .sub{color:var(--ink-soft);font-size:14px;margin:0 0 18px}
-  a{color:var(--act)}
-
-  .step{background:var(--card);border:1px solid var(--rule);border-radius:12px;
-    padding:16px;margin-bottom:16px}
-  .step > h2{font-size:12px;font-weight:700;text-transform:uppercase;
-    letter-spacing:.09em;color:var(--ink-soft);margin:0 0 12px}
-
-  label{display:block;font-size:13px;font-weight:600;margin:0 0 5px}
-  .hint{font-size:12.5px;color:var(--ink-soft);margin:6px 0 0}
-
-  textarea,input,select{font-family:inherit;font-size:15px;color:var(--ink);
-    background:var(--card);border:1px solid var(--rule);border-radius:8px;
-    padding:9px 10px;width:100%;min-height:44px}
-  textarea{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:13px;
-    min-height:88px;resize:vertical;white-space:pre;overflow-x:auto}
-  input:focus,textarea:focus,select:focus{outline:2px solid var(--act);outline-offset:1px;border-color:var(--act)}
-
-  .row{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
-  .row > div{flex:1;min-width:130px}
-
-  button{font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;
-    border-radius:8px;padding:11px 16px;min-height:44px;border:1px solid var(--act);
-    background:var(--act);color:#fff}
-  button:active{opacity:.75}
-  button.ghost{background:transparent;color:var(--act)}
-  button.ghost.danger{border-color:var(--danger);color:var(--danger)}
-  button:disabled{opacity:.45;cursor:default}
-  button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-  button[aria-pressed="true"]{background:var(--act);color:#fff}
-
-  /* --- messages --- */
-  .msg{font-size:13.5px;color:var(--ink-soft);padding:10px 12px;
-    background:var(--paper);border-radius:8px;border:1px solid var(--rule);margin:10px 0 0}
-  .msg.warn{border-color:#C58A2E;color:#7A5310;background:#FBF2E2}
-  .msg.ok{border-color:var(--act);color:var(--act);background:#E9F2F1}
-
-  /* --- tableau des codes --- */
-  table{width:100%;border-collapse:collapse;font-size:14px}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.07em;
-    color:var(--ink-soft);font-weight:700;padding:0 6px 7px 0;white-space:nowrap}
-  td{padding:5px 6px 5px 0;vertical-align:middle}
-  td:last-child,th:last-child{padding-right:0}
-  tr.pend td{background:#FBF2E2}
-  tr.pend td:first-child{border-radius:6px 0 0 6px}
-  tr.pend td:last-child{border-radius:0 6px 6px 0}
-  .code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;
-    font-size:14px;white-space:nowrap}
-  .swatch{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:6px;vertical-align:1px}
-  td input,td select{padding:7px 8px;font-size:14px;min-height:40px}
-  td input[type=text]{min-width:110px}
-  .tscroll{overflow-x:auto;margin:0 -4px;padding:0 4px}
-  .tscroll table{min-width:300px}
-  .delcode{background:transparent;border:none;color:var(--ink-soft);font-size:16px;
-    min-height:44px;min-width:44px;padding:0;border-radius:8px}
-  .delcode:active{color:var(--danger)}
-
-  /* --- grille du planning --- */
-  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:10px}
-  .dow{font-size:10px;text-transform:uppercase;letter-spacing:.06em;
-    color:var(--ink-soft);text-align:center;font-weight:700;padding-bottom:2px}
-  .cell{aspect-ratio:1;border-radius:5px;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;color:#fff;line-height:1.05;
-    font-size:12px;font-weight:700;position:relative;overflow:hidden}
-  .cell small{font-size:9px;font-weight:500;opacity:.8;margin-top:1px}
-  .cell .dnum{position:absolute;top:2px;left:3px;font-size:8.5px;font-weight:600;opacity:.75}
-  .cell.past{opacity:.55}
-  .cell.today{box-shadow:inset 0 0 0 2.5px var(--ink)}
-  /* Un jour sans poste, qu'il ait ou non une ligne en base : un seul état visible,
-     « à remplir ». La distinction interne ne regarde pas l'utilisateur. */
-  .cell.aremplir{background:transparent;border:1.5px dashed var(--ink-soft);color:var(--ink-soft)}
-  .cell.aremplir::after{content:"·";font-size:19px;line-height:0;opacity:.75}
-  .cell[data-key]{cursor:pointer}
-  .drow[data-key]{cursor:pointer}
-  @media (hover:hover){ .cell[data-key]:hover{filter:brightness(1.06)} .drow[data-key]:hover{background:#F3F6F8} }
-
-  /* --- feuille d'édition d'un jour --- */
-  .sheet-ov{position:fixed;inset:0;z-index:50;background:rgba(17,26,34,.45);
-    display:flex;align-items:flex-end;justify-content:center;padding:0}
-  .sheet{background:var(--card);width:100%;max-width:760px;border-radius:16px 16px 0 0;
-    padding:18px 16px calc(20px + env(safe-area-inset-bottom));max-height:85vh;overflow-y:auto}
-  .sheet-h{font-size:16px;font-weight:800;margin:0 0 12px}
-  .daygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
-  .daychoice{display:flex;align-items:center;gap:8px;justify-content:flex-start;
-    text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--rule);
-    font-weight:600;font-size:14px;padding:10px 12px;min-height:48px}
-  .daychoice.sel{border-color:var(--act);box-shadow:inset 0 0 0 1px var(--act)}
-  .daychoice .chip{min-width:30px}
-  .mois{grid-column:1/-1;font-size:11px;font-weight:800;text-transform:uppercase;
-    letter-spacing:.08em;color:var(--ink-soft);padding:12px 0 2px}
-  .lmois{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
-    color:var(--ink-soft);padding:14px 4px 4px}
-  .cell.vide{background:var(--rule);color:var(--ink-soft)}
-  .cell .mark{position:absolute;top:2px;right:3px;width:12px;height:12px;line-height:12px;
-    font-size:9px;font-weight:800;text-align:center;background:#fff;color:#7A5310;border-radius:50%}
-
-  /* --- vue liste jour par jour --- */
-  .dlist{margin-top:10px}
-  .drow{display:flex;align-items:center;gap:8px;padding:6px 4px;min-height:44px;
-    border-top:1px solid var(--rule);font-size:13.5px}
-  .drow:first-child{border-top:none}
-  .drow.past{opacity:.55}
-  .drow.today{box-shadow:inset 3px 0 0 var(--ink);background:#F3F6F8}
-  .drow .ld{width:76px;flex:none;color:var(--ink-soft);font-variant-numeric:tabular-nums;font-weight:600}
-  .chip{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;color:#fff;
-    border-radius:5px;padding:3px 7px;font-size:12px;flex:none;min-width:34px;text-align:center}
-  .drow .det{flex:1;min-width:0}
-  .drow .lever{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .drow .lever small{font-weight:500;color:var(--ink-soft)}
-  .warn-t{color:#7A5310;font-weight:600}
-
-  /* --- prochain réveil --- */
-  .next{background:var(--ink);color:#fff;border-radius:12px;padding:18px 16px;margin-bottom:16px}
-  .next .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.09em;opacity:.6;font-weight:700}
-  .next .hour{font-size:44px;font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:2px 0}
-  .next .det{font-size:13.5px;opacity:.78}
-  .next.rest .hour{font-size:26px}
-
-  .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-  .btns button{padding:9px 13px;font-size:14px}
-
-  .foot{font-size:12.5px;color:var(--ink-soft);margin-top:20px;line-height:1.55}
-
-  /* --- navigation basse --- */
-  .tabs{position:fixed;bottom:0;left:0;right:0;z-index:10;background:var(--card);
-    border-top:1px solid var(--rule);display:flex;justify-content:center;gap:4px;
-    padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
-  .tabs button{flex:1;max-width:170px;min-height:52px;border:none;background:transparent;
-    color:var(--ink-soft);font-weight:700;font-size:13.5px;border-radius:10px;padding:6px 2px}
-  .tabs button[aria-current="page"]{color:var(--act);background:var(--paper)}
-  .tabs .badge{display:inline-block;background:var(--danger);color:#fff;font-size:11px;
-    font-weight:700;border-radius:99px;min-width:17px;padding:1px 5px;margin-left:4px;vertical-align:1px}
-
-  /* --- impression (export PDF via « Enregistrer en PDF ») --- */
-  #printArea{display:none}
-  @media print{
-    body > *:not(#printArea){display:none !important}
-    #printArea{display:block !important;padding:8px}
-    #printArea h1{font-size:20px;margin:0 0 2px}
-    #printArea .psub{font-size:12px;color:#333;margin:0 0 12px}
-    .cell,.chip{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    .cell{font-size:10px}
-    .drow{min-height:auto;padding:3px 4px;font-size:11px;break-inside:avoid}
-    .cell.past,.drow.past{opacity:.55}
-  }
-  /* --- téléphone : la grille reste un aperçu couleur + code, les heures vont
-     dans la vue Liste (illisibles dans un carré de 44 px) --- */
-  .planhint-grid{display:none;font-size:12px;color:var(--ink-soft);margin:8px 0 0}
-  @media (max-width:520px){
-    .grid{gap:2px}
-    .cell{font-size:13.5px}
-    .cell small{display:none}
-    .cell .dnum{font-size:9px;opacity:.85}
-    .planhint-grid{display:block}
-  }
-  @media (prefers-reduced-motion:no-preference){.cell{transition:opacity .2s}}
-</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A1%3C/text%3E%3C/svg%3E">
+<title>Chez F&amp;A</title>
+<link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 
 <!-- ======== écran de connexion (masqué une fois la session ouverte) ======== -->
 <div id="authEcran" hidden>
   <div class="wrap" style="max-width:420px;padding-top:56px">
-    <h1>Planning famille</h1>
+    <h1>Chez F&amp;A</h1>
     <p class="sub">Connexion par lien reçu par mail — une seule fois par appareil.</p>
     <div class="step">
       <label for="authMail">Ton adresse mail</label>
@@ -213,10 +30,142 @@
 </div>
 
 <div class="wrap" id="appEcran" hidden>
-  <div id="next"></div>
 
-  <!-- ======== onglet Importer ======== -->
-  <section class="tab" data-tab="importer" hidden>
+  <!-- ======== onglet Courses ======== -->
+  <section class="tab" data-tab="courses" hidden>
+    <div class="step">
+      <h2>Liste de courses</h2>
+      <div class="row" style="margin-top:0">
+        <div style="flex:3">
+          <label for="coursesAjout">Ajouter</label>
+          <input type="text" id="coursesAjout" placeholder="lait, pain, œufs…"
+                 autocomplete="off" enterkeyhint="done">
+        </div>
+        <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+          <button id="coursesAjoutBtn">Ajouter</button>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:6px">Sépare par des virgules pour en ajouter plusieurs d'un coup.</p>
+      <div id="coursesSugg"></div>
+      <p class="meta hint" id="coursesInfo" style="margin:14px 0 0"></p>
+      <div id="coursesUndo" class="undo" hidden></div>
+      <div id="coursesListe"></div>
+      <div id="coursesPris"></div>
+    </div>
+    <p class="foot">Cocher ne supprime rien&nbsp;: l'article se barre et descend dans «&nbsp;Pris&nbsp;».<br>
+    La liste ne se vide qu'avec «&nbsp;Terminer les courses&nbsp;».</p>
+  </section>
+
+  <!-- ======== onglet Agenda ======== -->
+  <section class="tab" data-tab="agenda" hidden>
+    <div class="step">
+      <h2>Agenda</h2>
+      <p class="meta hint" id="agendaInfo" style="margin:0"></p>
+      <div class="btns">
+        <button class="ghost" id="agVueGrille" aria-pressed="false">Grille</button>
+        <button class="ghost" id="agVueListe" aria-pressed="true">Liste</button>
+      </div>
+      <div id="agendaListe"></div>
+      <div class="btns">
+        <button id="evtNouveau">+ Nouvel événement</button>
+      </div>
+    </div>
+    <p class="foot">Appuie sur un événement pour le modifier.<br>
+    Le poste de Fab s'affiche en face de chaque événement d'un seul jour&nbsp;—
+    et teinte le fond des jours travaillés en vue grille.</p>
+  </section>
+
+  <!-- ======== onglet Rappels ======== -->
+  <section class="tab" data-tab="rappels" hidden>
+    <div class="step">
+      <h2>Ajouter</h2>
+      <label for="rapTitre">Quoi&nbsp;?</label>
+      <input type="text" id="rapTitre" placeholder="ex. vermifuge de Minou" autocomplete="off">
+      <div class="row">
+        <div>
+          <label for="rapCat">Catégorie</label>
+          <select id="rapCat"></select>
+        </div>
+        <div>
+          <label for="rapQui">Pour qui</label>
+          <select id="rapQui"></select>
+        </div>
+        <div>
+          <label for="rapPeriode">Fréquence</label>
+          <select id="rapPeriode"></select>
+        </div>
+        <div id="rapDateBloc">
+          <label for="rapDate" id="rapDateLbl">Prochaine fois</label>
+          <input type="date" id="rapDate">
+        </div>
+      </div>
+      <div class="row" id="rapPersoBloc" hidden>
+        <div>
+          <label for="rapPersoValeur">Tous les</label>
+          <input type="number" id="rapPersoValeur" min="1" max="99" step="1" value="2" inputmode="numeric">
+        </div>
+        <div>
+          <label for="rapPersoUnite">Unité</label>
+          <select id="rapPersoUnite">
+            <option value="mois" selected>mois</option>
+            <option value="jour">jours</option>
+          </select>
+        </div>
+      </div>
+      <label for="rapNote">Note (facultative)</label>
+      <input type="text" id="rapNote" placeholder="ex. pipette dans le cou, 2,5 kg" autocomplete="off">
+      <div class="row">
+        <button id="rapAjout">Ajouter le rappel</button>
+      </div>
+      <div id="rapMsg"></div>
+    </div>
+    <div class="step">
+      <h2>Ce qui arrive</h2>
+      <p class="meta hint" id="rappelsInfo" style="margin:0 0 4px"></p>
+      <nav class="filtres" id="rappelsFiltres" aria-label="Filtrer par catégorie"></nav>
+      <div id="rappelsListe"></div>
+    </div>
+    <p class="foot">Appuie sur un rappel pour le modifier.<br>
+    «&nbsp;Fait&nbsp;» consigne la date et repousse le rappel d'une période&nbsp;—
+    l'historique répond à «&nbsp;c'était quand, la dernière fois&nbsp;?&nbsp;».</p>
+  </section>
+
+  <!-- ======== onglet Planning ========
+       Importer, Exporter et les codes sont des opérations SUR le planning :
+       ils vivent donc dans le planning, pas à côté de lui dans la barre du bas.
+       Celle-ci ne porte que les usages — courses, planning, et demain l'agenda. -->
+  <section class="tab" data-tab="planning" hidden>
+    <nav class="subtabs" aria-label="Sections du planning">
+      <button data-sub="voir" aria-current="page">Le planning</button>
+      <button data-sub="importer" aria-current="false">Importer</button>
+      <button data-sub="exporter" aria-current="false">Exporter</button>
+      <button data-sub="codes" aria-current="false">Codes<span id="reglagesBadge" class="badge" hidden></span></button>
+    </nav>
+
+    <!-- ---- le planning lui-même ---- -->
+    <div class="subtab" data-sub="voir">
+      <div id="next"></div>
+      <div class="step">
+        <h2>Ton planning</h2>
+        <p class="meta hint" id="planInfo" style="margin:0"></p>
+        <div id="planNotes"></div>
+        <div class="btns">
+          <button class="ghost" id="viewGrid" aria-pressed="true">Grille</button>
+          <button class="ghost" id="viewList" aria-pressed="false">Liste</button>
+        </div>
+        <div id="planView"></div>
+        <p class="planhint-grid" id="gridHint">👉 Heures détaillées dans la vue <strong>Liste</strong>.</p>
+        <p class="hint" id="planTip" style="margin-top:12px">Appuie sur un jour pour le modifier à la main.</p>
+        <div class="btns">
+          <button class="ghost" id="addWeek">+ Ajouter une semaine</button>
+          <button class="ghost" id="delWeek">− Retirer une semaine</button>
+          <button class="ghost danger" id="clearPlan">Effacer le planning</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- importer un cycle ---- -->
+    <div class="subtab" data-sub="importer" hidden>
     <div class="step">
       <h2>Ta ligne</h2>
       <textarea id="line" placeholder="Colle ici les codes de ton cycle, un par jour."></textarea>
@@ -232,34 +181,13 @@
       </div>
       <div id="saveMsg"></div>
     </div>
-    <p class="foot">Le planning importé est partagé avec les autres comptes du foyer&nbsp;:
+    <p class="foot">Le planning importé est partagé avec l’autre compte&nbsp;:
     inutile de refaire l'import sur chaque appareil.<br>
     Chaque appareil garde une copie pour l'affichage hors réseau.</p>
-  </section>
-
-  <!-- ======== onglet Planning ======== -->
-  <section class="tab" data-tab="planning" hidden>
-    <div class="step">
-      <h2>Ton planning</h2>
-      <p class="meta hint" id="planInfo" style="margin:0"></p>
-      <div id="planNotes"></div>
-      <div class="btns">
-        <button class="ghost" id="viewGrid" aria-pressed="true">Grille</button>
-        <button class="ghost" id="viewList" aria-pressed="false">Liste</button>
-      </div>
-      <div id="planView"></div>
-      <p class="planhint-grid" id="gridHint">👉 Heures détaillées dans la vue <strong>Liste</strong>.</p>
-      <p class="hint" id="planTip" style="margin-top:12px">Appuie sur un jour pour le modifier à la main.</p>
-      <div class="btns">
-        <button class="ghost" id="addWeek">+ Ajouter une semaine</button>
-        <button class="ghost" id="delWeek">− Retirer une semaine</button>
-        <button class="ghost danger" id="clearPlan">Effacer le planning</button>
-      </div>
     </div>
-  </section>
 
-  <!-- ======== onglet Export ======== -->
-  <section class="tab" data-tab="export" hidden>
+    <!-- ---- exporter vers un calendrier ---- -->
+    <div class="subtab" data-sub="exporter" hidden>
     <div class="step">
       <h2>Exporter</h2>
       <div class="row" style="margin-top:0">
@@ -285,34 +213,63 @@
     PDF&nbsp;: la boîte d'impression s'ouvre, choisis «&nbsp;Enregistrer en PDF&nbsp;».<br>
     Les alertes du calendrier ne sonnent pas en mode silencieux&nbsp;— c'est le raccourci
     «&nbsp;Réveils&nbsp;» qui pose les vraies alarmes à partir de ces événements.</p>
+    </div>
+
+    <!-- ---- codes et horaires : la configuration propre au planning ---- -->
+    <div class="subtab" data-sub="codes" hidden>
+      <div class="step">
+        <h2>Réveil</h2>
+        <label for="lead">Se lever combien de temps avant la prise de poste&nbsp;?</label>
+        <input type="number" id="lead" min="0" max="240" step="5" value="45" inputmode="numeric">
+        <p class="hint">En minutes. Utilisé partout&nbsp;: heure de lever affichée, alarmes des exports.</p>
+      </div>
+      <div class="step">
+        <h2>Tes codes</h2>
+        <div id="codesArea"><p class="msg">Aucun code pour l'instant. Ils apparaîtront au premier import.</p></div>
+        <p class="hint">À remplir une seule fois : les horaires sont réutilisés d'un cycle à l'autre.
+          <strong>M</strong> et <strong>m</strong> sont deux postes différents.</p>
+      </div>
+      <div class="step">
+        <h2>Calendrier</h2>
+        <label for="calName">Nom du calendrier pour les exports</label>
+        <input type="text" id="calName" value="Travail" placeholder="ex. Planning Fab">
+        <p class="hint">Le fichier .ics porte ce nom. À l'import (iPhone ou Google Agenda),
+          choisis ou crée le sous-calendrier du même nom — «&nbsp;Travail&nbsp;», «&nbsp;Planning Fab&nbsp;»…</p>
+      </div>
+    </div>
   </section>
 
-  <!-- ======== onglet Réglages ======== -->
+  <!-- ======== onglet Réglages ========
+       Ne garde que ce qui concerne l'appli et les deux comptes. Chaque module porte ses
+       propres réglages : sans cette règle, cet onglet redeviendrait le fourre-tout
+       de tous les modules à mesure qu'ils arrivent. -->
   <section class="tab" data-tab="reglages" hidden>
     <div class="step">
-      <h2>Réveil</h2>
-      <label for="lead">Se lever combien de temps avant la prise de poste&nbsp;?</label>
-      <input type="number" id="lead" min="0" max="240" step="5" value="45" inputmode="numeric">
-      <p class="hint">En minutes. Utilisé partout&nbsp;: heure de lever affichée, alarmes des exports.</p>
-    </div>
-    <div class="step">
-      <h2>Tes codes</h2>
-      <div id="codesArea"><p class="msg">Aucun code pour l'instant. Ils apparaîtront au premier import.</p></div>
-      <p class="hint">À remplir une seule fois : les horaires sont réutilisés d'un cycle à l'autre.
-        <strong>M</strong> et <strong>m</strong> sont deux postes différents.</p>
-    </div>
-    <div class="step">
-      <h2>Calendrier</h2>
-      <label for="calName">Nom du calendrier pour les exports</label>
-      <input type="text" id="calName" value="Travail" placeholder="ex. Planning Fab">
-      <p class="hint">Le fichier .ics porte ce nom. À l'import (iPhone ou Google Agenda),
-        choisis ou crée le sous-calendrier du même nom — «&nbsp;Travail&nbsp;», «&nbsp;Planning Fab&nbsp;»…</p>
+      <h2>Idées d'évolution</h2>
+      <label for="ideeTexte">Noter une idée</label>
+      <textarea id="ideeTexte" rows="2" placeholder="ex. suivi des chats — vaccins, vermifuge…"
+                style="font-family:inherit;font-size:15px;white-space:normal;min-height:64px"></textarea>
+      <div class="row">
+        <button id="ideeBtn">Ajouter l'idée</button>
+      </div>
+      <p class="meta hint" id="ideesInfo" style="margin:12px 0 0"></p>
+      <div id="ideesListe"></div>
+      <p class="hint">Les idées sont partagées entre vos deux comptes et se retrouvent
+        depuis n'importe quel appareil. Entrée valide, Maj+Entrée passe à la ligne.</p>
     </div>
     <div class="step">
       <h2>Compte et synchronisation</h2>
       <p class="hint" id="syncInfo" style="margin:0 0 10px"></p>
       <div id="syncCfg" hidden>
+        <label for="monPrenom">Ton prénom, tel qu'il apparaît dans l'appli</label>
         <div class="row" style="margin-top:0">
+          <div style="flex:3"><input type="text" id="monPrenom" autocomplete="given-name" maxlength="24"></div>
+          <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+            <button class="ghost" id="prenomSave">Enregistrer</button>
+          </div>
+        </div>
+        <div id="prenomMsg"></div>
+        <div class="row">
           <button id="syncNowBtn">Synchroniser maintenant</button>
           <button class="ghost danger" id="deconnexion">Se déconnecter</button>
         </div>
@@ -327,9 +284,9 @@
       </div>
       <input type="file" id="impJson" accept=".json,application/json" hidden>
       <div id="backupMsg"></div>
-      <p class="hint">Le fichier contient codes, planning et réglages&nbsp;: c'est lui qui sert à passer
-        d'un appareil à l'autre (AirDrop, mail, Drive…). À l'import, ce qui vient du fichier remplace
-        ce qui existe en double, le reste est conservé.</p>
+      <p class="hint">Le fichier contient codes, planning et réglages&nbsp;: c'est le filet
+        indépendant de Supabase, celui qui permet de repartir si le service disparaît.
+        À l'import, ce qui vient du fichier remplace ce qui existe en double, le reste est conservé.</p>
     </div>
   </section>
 </div>
@@ -339,1110 +296,17 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 
 <nav class="tabs" id="barreOnglets" aria-label="Navigation" hidden>
-  <button data-tab="planning" aria-current="false">Planning</button>
-  <button data-tab="importer" aria-current="false">Importer</button>
-  <button data-tab="export" aria-current="false">Exporter</button>
-  <button data-tab="reglages" aria-current="false">Réglages<span id="reglagesBadge" class="badge" hidden></span></button>
+  <button data-tab="courses" aria-current="false">Courses<span id="coursesBadge" class="badge" hidden></span></button>
+  <span class="sep" aria-hidden="true"></span>
+  <button data-tab="rappels" aria-current="false">Rappels<span id="rappelsBadge" class="badge" hidden></span></button>
+  <span class="sep" aria-hidden="true"></span>
+  <button data-tab="agenda" aria-current="false">Agenda</button>
+  <span class="sep" aria-hidden="true"></span>
+  <button data-tab="planning" aria-current="false">Planning Fab<span id="planningBadge" class="badge" hidden></span></button>
+  <span class="sep" aria-hidden="true"></span>
+  <button data-tab="reglages" aria-current="false">Réglages</button>
 </nav>
 
-<script>
-"use strict";
-
-/* ===== synchronisation =====
-   Les données vivent dans une base Supabase privée : une ligne par jour, une par
-   code. Chaque membre du foyer a un compte ; seuls les adultes écrivent. Deux
-   personnes peuvent modifier en même temps sans s'écraser — contrairement au
-   fichier unique d'avant, la comparaison se fait ligne par ligne.
-
-   La clé ci-dessous est PUBLIQUE par conception (« publishable ») : elle ne donne
-   accès à rien sans compte, c'est la sécurité au niveau des lignes, côté base, qui
-   protège. Ne jamais mettre ici la clé « service_role », qui contourne tout. */
-const SB_URL = "https://fjhmzcvivomqyyyemvny.supabase.co";
-const SB_KEY = "sb_publishable_X8_UhCVsZC0hd6QipbtnZA_FOECka0X";
-
-const sb = window.supabase.createClient(SB_URL, SB_KEY, {
-  auth: {persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
-});
-let session = null;    // session Supabase, null tant qu'on n'est pas connecté
-let moi = null;        // ligne « profil » du compte connecté
-
-/* ---------- stockage, tolérant à l'environnement ---------- */
-const store = {
-  async get(k){
-    try{ if(window.storage){ const r = await window.storage.get(k); return r? r.value : null; } }catch(e){}
-    try{ return localStorage.getItem(k); }catch(e){ return null; }
-  },
-  async set(k,v){
-    try{ if(window.storage){ await window.storage.set(k,v); return; } }catch(e){}
-    try{ localStorage.setItem(k,v); }catch(e){}
-  }
-};
-
-const VERSION = 3;
-const TYPES = {
-  matin:{lbl:"Matin",      c:"var(--matin)"},
-  aprem:{lbl:"Après-midi", c:"var(--aprem)"},
-  nuit: {lbl:"Nuit",       c:"var(--nuit)"},
-  jour: {lbl:"Journée",    c:"var(--jour)"},
-  repos:{lbl:"Repos",      c:"var(--repos)"},
-  vacances:{lbl:"Vacs", c:"var(--vacances)"},
-  autre:{lbl:"Autre",      c:"var(--autre)"}
-};
-/* jours sans réveil : repos et vacances (informatifs, jamais d'alarme) */
-const NOALARM = t => t==="repos" || t==="vacances";
-const DOW = ["L","M","Me","J","V","S","D"];
-/* palette de codes proposée dans l'éditeur d'un jour. La casse n'est pas
-   significative (A = a, M = m…) : ces orthographes sont les formes canoniques. */
-const KNOWN_CODES = ["M","A","N","Ne","Nf","Nwe","J","B","Bp","Bp1","R","Rh"];
-/* horaires par défaut à la création d'un code. « N » est un double poste :
-   deux créneaux dans la même journée. Le 1er (00:00–06:30) est la fin d'une nuit
-   déjà en cours — pas de réveil (déjà sonné la veille) ; seul le 2e (19:30) sonne. */
-const CODE_DEFAULTS = {
-  "N":  {type:"nuit", debut:"00:00", fin:"06:30", debut2:"19:30", fin2:"00:00", noReveil1:true},
-  "Nf": {type:"nuit", debut:"00:00", fin:"06:30", noReveil1:true}   /* nuit fin : suite de la nuit de la veille, pas de réveil */
-};
-
-let ref = {};        // référentiel : code -> {libelle, type, debut, fin}
-let jours = {};      // LE planning : "AAAAMMJJ" -> code (un seul, réécrit à chaque import)
-let prefs = {lead:45, calName:"Travail"};
-let pasteCells = []; // codes découpés de l'onglet Importer
-let planMode = "grid"; // vue du planning : "grid" | "list"
-
-/* synchro : dernier état connu de la base, pour n'envoyer que ce qui a changé */
-let srvRef = {}, srvJours = {}, srvPrefs = {};
-let syncTimer = null, syncBusy = false, applying = false, canalTemsReel = null;
-
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
-
-/* ---------- persistance ---------- */
-const wrap = data => JSON.stringify({v:VERSION, data});
-function unwrap(raw){
-  if(raw==null) return null;
-  try{ const o = JSON.parse(raw); return (o && typeof o==="object" && "data" in o) ? o.data : o; }
-  catch(e){ return null; }
-}
-/* Tout enregistrement écrit le cache local (affichage immédiat, y compris hors
-   réseau) puis programme un envoi vers la base — sauf quand on est justement en
-   train d'appliquer des données reçues d'elle. */
-function bump(){ if(!applying) scheduleSync(); }
-const saveRef   = () => { store.set("cycle:codes", wrap(ref)); bump(); };
-const saveJours = () => { store.set("cycle:jours", wrap(jours)); bump(); };
-const savePrefs = () => { store.set("cycle:prefs", wrap(prefs)); bump(); };
-
-/* ---------- découpage de la ligne ---------- */
-/* Cellule d'en-tête : contient un espace ou dépasse 4 caractères (nom, mention de
-   validation…). Les codes de poste font au plus 3-4 caractères, sans espace. */
-const isHeaderCell = c => c.includes(" ") || c.length > 4;
-
-function parseLine(raw){
-  if(!raw.trim()) return {head:[], codes:[]};
-  let parts = raw.includes("\t")
-    ? raw.replace(/\r?\n/g,"\t").split("\t").map(s=>s.trim())
-    : raw.trim().split(/\s+/);
-  while(parts.length && parts[parts.length-1]==="") parts.pop();
-  /* L'en-tête peut contenir des cellules courtes (n° d'équipe, validation) :
-     on coupe après la dernière cellule d'allure « en-tête » trouvée en début de ligne. */
-  let cut = 0;
-  for(let i=0; i<Math.min(parts.length, 8); i++)
-    if(parts[i] !== "" && isHeaderCell(parts[i])) cut = i+1;
-  return {head:parts.slice(0,cut), codes:parts.slice(cut)};
-}
-
-function guessType(code){
-  const c = code.toLowerCase();
-  if(c.startsWith("r")) return "repos";
-  if(c.startsWith("m")) return "matin";
-  if(c.startsWith("a")) return "aprem";
-  if(c.startsWith("n")) return "nuit";
-  if(c.startsWith("j")) return "jour";
-  return "autre";
-}
-
-/* Forme canonique d'un code, insensible à la casse : « a » → « A », « nWE » → « Nwe ».
-   La palette standard prime, puis les codes déjà connus. */
-function canon(code){
-  if(!code) return code;
-  const low = code.toLowerCase();
-  for(const k of KNOWN_CODES) if(k.toLowerCase() === low) return k;
-  for(const k of Object.keys(ref)) if(k.toLowerCase() === low) return k;
-  return code;
-}
-
-/* Crée l'entrée d'un code, avec ses horaires par défaut s'ils sont connus. */
-function newCode(c){
-  const d = CODE_DEFAULTS[c];
-  return d ? Object.assign({libelle:"", debut:"", fin:""}, d)
-           : {libelle:"", type:guessType(c), debut:"", fin:""};
-}
-
-/* Créneaux de travail d'un code (1, ou 2 pour un double poste comme N).
-   `alarm` = ce créneau déclenche un réveil (le 1er créneau de N n'en déclenche pas). */
-function segsOf(k){
-  const s = [];
-  if(k.debut)  s.push({debut:k.debut,  fin:k.fin  || k.debut,  alarm: !k.noReveil1});
-  if(k.debut2) s.push({debut:k.debut2, fin:k.fin2 || k.debut2, alarm: !k.noReveil2});
-  return s;
-}
-
-/* Mise en conformité des données (casse fusionnée, N en double poste, Vacances→Vacs).
-   Modifie ref/jours en place ; le sauvegarde est laissé à l'appelant. */
-function migrate(){
-  let ch = false;
-  if(ref["Vacances"]){ if(!ref["Vacs"]) ref["Vacs"] = ref["Vacances"]; ref["Vacs"].type = "vacances"; delete ref["Vacances"]; ch = true; }
-  const remap = {};
-  Object.keys(ref).forEach(c=>{
-    const cc = canon(c);
-    if(cc !== c){ if(!ref[cc]) ref[cc] = ref[c]; delete ref[c]; remap[c] = cc; ch = true; }
-  });
-  Object.keys(jours).forEach(k=>{
-    const v = jours[k];
-    if(v === "Vacances"){ jours[k] = "Vacs"; ch = true; return; }
-    if(!v) return;
-    const cv = remap[v] || canon(v);
-    if(cv !== v){ jours[k] = cv; ch = true; }
-  });
-  if(ref["N"] && !("debut2" in ref["N"])){ Object.assign(ref["N"], CODE_DEFAULTS["N"]); ch = true; }
-  /* 1er créneau de N sans réveil (données antérieures à cette règle) */
-  if(ref["N"] && ref["N"].debut2 && !("noReveil1" in ref["N"])){ ref["N"].noReveil1 = true; ch = true; }
-  /* Nf (nuit fin) : suite de la nuit de la veille, pas de réveil */
-  if(ref["Nf"] && !("noReveil1" in ref["Nf"])){ ref["Nf"].noReveil1 = true; ch = true; }
-  return ch;
-}
-
-/* ---------- dates (locales, sans UTC) ---------- */
-const pad = n => String(n).padStart(2,"0");
-function dateFrom(s){ const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); }
-function addDays(s,i){ const dt = dateFrom(s); dt.setDate(dt.getDate()+i); return dt; }
-const iso = dt => dt.getFullYear()+pad(dt.getMonth()+1)+pad(dt.getDate());
-const isoInput = dt => dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate());
-const dateOfKey = k => new Date(+k.slice(0,4), +k.slice(4,6)-1, +k.slice(6,8));
-const keyOfInput = s => s.replaceAll("-","");
-const todayKey = () => iso(new Date());
-const fmtLong  = dt => dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
-const fmtLongY = dt => dt.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-const fmtShort = dt => dt.toLocaleDateString("fr-FR",{weekday:"short",day:"2-digit",month:"2-digit"});
-
-function minusMinutes(dt, hhmm, mins){
-  const [h,m] = hhmm.split(":").map(Number);
-  const d = new Date(dt); d.setHours(h, m-mins, 0, 0);
-  return d;
-}
-
-/* ---------- le planning : un seul, par jour ---------- */
-const planKeys = () => Object.keys(jours).sort();
-
-/* Ménage : les jours plus vieux de 90 jours sortent du planning. Appliqué de la
-   même façon sur toutes les données (locales, reçues, publiées) et sans jamais
-   compter comme une modification — sinon un simple lecteur divergerait du dépôt. */
-const pruneCutoff = () => { const d = new Date(); d.setDate(d.getDate()-90); return iso(d); };
-function pruneJours(o){
-  const cutoff = pruneCutoff();
-  let ch = false;
-  Object.keys(o||{}).forEach(k=>{ if(k < cutoff){ delete o[k]; ch = true; } });
-  return ch;
-}
-const pendingCodes = () =>
-  Object.keys(ref).filter(c => !NOALARM(ref[c].type) && !ref[c].debut);
-
-/* Statut d'un jour : "off" (rien de planifié), "vide" (jour ajouté à remplir),
-   "inconnu", "repos", "vacances", "sansheure", "ok". */
-function statusOf(key){
-  if(!(key in jours)) return "off";
-  const c = jours[key];
-  if(c === "") return "vide";
-  const k = ref[c];
-  if(!k) return "inconnu";
-  if(k.type === "repos") return "repos";
-  if(k.type === "vacances") return "vacances";
-  if(!k.debut) return "sansheure";
-  return "ok";
-}
-
-/* ================= onglet Importer ================= */
-function renderImporter(){
-  const raw = $("line").value;
-  const {head, codes} = parseLine(raw);
-  pasteCells = codes;
-  const box = $("parseInfo");
-  const startV = $("start").value;
-
-  if(!raw.trim()){ box.innerHTML=""; $("saveCycle").disabled = true; return; }
-
-  let h = "";
-  if(head.length)
-    h += `<p class="msg">En-tête détecté et ignoré&nbsp;: ${head.map(esc).join(" · ")}</p>`;
-
-  if(!codes.length){
-    h += `<p class="msg warn">Aucun code détecté dans ce collage.</p>`;
-  }else if(startV){
-    const d0 = dateFrom(startV), d1 = addDays(startV, codes.length-1);
-    h += `<p class="msg"><strong>${codes.length} jours</strong> depuis le ${fmtLong(d0)}
-      → fin le <strong>${fmtLongY(d1)}</strong> (= début + ${codes.length-1} jours).</p>`;
-    if(codes.length % 7 === 0)
-      h += `<p class="msg ok">Soit ${codes.length/7} semaine${codes.length>7?"s":""} complète${codes.length>7?"s":""}.</p>`;
-    else
-      h += `<p class="msg warn">${codes.length} n'est pas un multiple de 7 — c'est presque toujours
-        une erreur de collage. Vérifie qu'il ne manque pas de cellules.</p>`;
-
-    let rewrite = 0;
-    for(let i=0;i<codes.length;i++) if(iso(addDays(startV,i)) in jours) rewrite++;
-    if(rewrite)
-      h += `<p class="msg warn">${rewrite} jour${rewrite>1?"s":""} déjà planifié${rewrite>1?"s":""}
-        ser${rewrite>1?"ont":"a"} réécrit${rewrite>1?"s":""} par cet import.</p>`;
-  }else{
-    h += `<p class="msg warn">Choisis le premier jour du cycle pour voir les dates.</p>`;
-  }
-
-  const vides = codes.filter(c=>c==="").length;
-  if(vides)
-    h += `<p class="msg warn">${vides} cellule${vides>1?"s":""} vide${vides>1?"s":""} au milieu de la ligne&nbsp;:
-      ces jours n'auront pas de réveil.</p>`;
-
-  const unk = [...new Set(codes.map(c=> c?canon(c):""))].filter(c => c && !ref[c]);
-  if(unk.length)
-    h += `<p class="msg warn">Nouveau${unk.length>1?"x":""} code${unk.length>1?"s":""}&nbsp;:
-      ${unk.map(esc).join(", ")}. Ils seront ajoutés dans Réglages, à compléter avec leurs horaires.</p>`;
-
-  box.innerHTML = h;
-  $("saveCycle").disabled = !(codes.length && startV);
-}
-
-function saveCycle(){
-  const startV = $("start").value;
-  if(!startV || !pasteCells.length) return;
-
-  const cells = pasteCells.map(c => c ? canon(c) : "");
-  const unk = [...new Set(cells)].filter(c => c && !ref[c]);
-  unk.forEach(c => ref[c] = newCode(c));
-
-  cells.forEach((c,i)=>{ jours[iso(addDays(startV,i))] = c; });
-  saveRef(); saveJours();
-
-  $("line").value = "";
-  const p = pendingCodes();
-  const keys = planKeys();
-  $("expEnd").value = isoInput(dateOfKey(keys[keys.length-1]));   /* la plage d'export suit le planning */
-  renderAll();
-  $("saveMsg").innerHTML = `<p class="msg ok">Planning mis à jour — voir l'onglet Planning.</p>`
-    + (p.length ? `<p class="msg warn">${p.length} code${p.length>1?"s":""} sans horaire
-       (${p.map(esc).join(", ")})&nbsp;: à compléter dans Réglages, sinon ces jours ne sonneront pas.</p>` : "");
-}
-
-/* ================= Réglages : codes ================= */
-function renderCodes(){
-  const box = $("codesArea");
-  const codesList = Object.keys(ref).filter(c=> c!=="Vacs");
-  const pend = pendingCodes();
-
-  const badge = $("reglagesBadge");
-  badge.hidden = !pend.length;
-  badge.textContent = pend.length || "";
-
-  if(!codesList.length){
-    box.innerHTML = '<p class="msg">Aucun code pour l\'instant. Ils apparaîtront au premier import.</p>';
-    return;
-  }
-
-  /* codes en attente d'horaire en premier, puis ordre alphabétique (sensible à la casse) */
-  codesList.sort((a,b)=>{
-    const pa = pend.includes(a), pb = pend.includes(b);
-    if(pa !== pb) return pa ? -1 : 1;
-    return a < b ? -1 : a > b ? 1 : 0;
-  });
-
-  let h = '<div class="tscroll"><table><thead><tr><th>Code</th><th>Début</th><th>Fin</th><th></th></tr></thead><tbody>';
-  codesList.forEach(c=>{
-    const k = ref[c];
-    const off = NOALARM(k.type) ? " disabled" : "";
-    h += `<tr${pend.includes(c) ? ' class="pend"' : ''}>
-      <td class="code"><span class="swatch" style="background:${TYPES[k.type].c}"></span>${esc(c)}${NOALARM(k.type) ? ` <span style="font-weight:500;color:var(--ink-soft)">${TYPES[k.type].lbl.toLowerCase()}</span>` : ''}${k.noReveil1 ? ` <span style="font-weight:500;color:var(--ink-soft)">· 1er créneau sans réveil</span>` : ''}</td>
-      <td><input type="time" data-c="${esc(c)}" data-f="debut" value="${k.debut}"${off} aria-label="Heure de début du code ${esc(c)}"></td>
-      <td><input type="time" data-c="${esc(c)}" data-f="fin" value="${k.fin}"${off} aria-label="Heure de fin du code ${esc(c)}"></td>
-      <td><button class="delcode" data-del="${esc(c)}" aria-label="Supprimer le code ${esc(c)}">✕</button></td>
-    </tr>`;
-    if("debut2" in k){
-      h += `<tr>
-        <td class="code" style="font-weight:500;color:var(--ink-soft);padding-left:14px">↳ 2ᵉ créneau</td>
-        <td><input type="time" data-c="${esc(c)}" data-f="debut2" value="${k.debut2||""}" aria-label="Début du 2e créneau de ${esc(c)}"></td>
-        <td><input type="time" data-c="${esc(c)}" data-f="fin2" value="${k.fin2||""}" aria-label="Fin du 2e créneau de ${esc(c)}"></td>
-        <td></td></tr>`;
-    }
-  });
-  box.innerHTML = h + "</tbody></table></div>";
-
-  if(pend.length){
-    const p = document.createElement("p");
-    p.className = "msg warn";
-    p.textContent = `Il manque l'heure de début pour : ${pend.join(", ")}. Ces jours n'auront pas de réveil.`;
-    box.appendChild(p);
-  }
-
-  box.querySelectorAll("[data-c]").forEach(el=>{
-    el.addEventListener("change", e=>{
-      const t = e.target;
-      ref[t.dataset.c][t.dataset.f] = t.value;
-      saveRef(); renderAll();
-    });
-  });
-  box.querySelectorAll("[data-del]").forEach(el=>{
-    el.addEventListener("click", ()=>{
-      const c = el.dataset.del;
-      const used = Object.values(jours).filter(x=>x===c).length;
-      const extra = used ? ` Il est utilisé sur ${used} jour${used>1?"s":""} planifié${used>1?"s":""} : ces jours n'auront plus de réveil.` : "";
-      if(!confirm(`Supprimer le code ${c} ?${extra}`)) return;
-      delete ref[c]; saveRef(); renderAll();
-    });
-  });
-}
-
-/* ================= prochain réveil (bandeau global) ================= */
-function renderNext(){
-  const box = $("next");
-  const keys = planKeys();
-  if(!keys.length){ box.innerHTML = ""; return; }
-
-  const tk = todayKey(), now = new Date();
-  /* le réveil le plus proche dans le futur, tous jours et tous créneaux confondus
-     (un créneau à 00:00 réveille la veille au soir) */
-  let best = null;
-  for(const key of keys){
-    const code = jours[key];
-    const k = ref[code];
-    if(!k || NOALARM(k.type)) continue;
-    const dt = dateOfKey(key);
-    for(const s of segsOf(k)){
-      if(!s.alarm) continue;                               /* créneau sans réveil (1er créneau de N) */
-      const w = minusMinutes(dt, s.debut, prefs.lead);
-      if(w > now && (!best || w < best.w)) best = {w, code, debut:s.debut};
-    }
-  }
-  if(best){
-    box.innerHTML = `<div class="next"><div class="lbl">Prochain réveil</div>
-      <div class="hour">${pad(best.w.getHours())}:${pad(best.w.getMinutes())}</div>
-      <div class="det">${fmtLong(best.w)} · poste ${esc(best.code)} à ${best.debut}</div></div>`;
-    return;
-  }
-  /* pas de réveil à venir : montrer le prochain jour de repos/vacances, sinon rien */
-  const nk = keys.find(k => k >= tk);
-  if(nk && ref[jours[nk]] && NOALARM(ref[jours[nk]].type)){
-    box.innerHTML = `<div class="next rest"><div class="lbl">Prochain jour</div>
-      <div class="hour">${TYPES[ref[jours[nk]].type].lbl}</div>
-      <div class="det">${fmtLong(dateOfKey(nk))} · pas de réveil</div></div>`;
-    return;
-  }
-  box.innerHTML = `<div class="next rest"><div class="lbl">Prochain réveil</div>
-    <div class="hour">Rien à venir</div>
-    <div class="det">Le planning est terminé — importe la suite.</div></div>`;
-}
-
-/* ================= rendu grille / liste sur une plage ================= */
-const moisLbl = dt => {
-  const t = dt.toLocaleDateString("fr-FR",{month:"long",year:"numeric"});
-  return t.charAt(0).toUpperCase()+t.slice(1);
-};
-
-function gridHtml(k0, k1){
-  const tk = todayKey();
-  /* caler la grille sur la semaine : lundi avant k0, dimanche après k1 */
-  const d0 = dateOfKey(k0); d0.setDate(d0.getDate() - (d0.getDay()+6)%7);
-  const d1 = dateOfKey(k1); d1.setDate(d1.getDate() + (7-d1.getDay())%7);
-  let h = '<div class="grid">' + DOW.map(d=>`<div class="dow">${d}</div>`).join("");
-  for(let ws = new Date(d0); ws <= d1; ws.setDate(ws.getDate()+7)){
-    /* libellé de mois avant la première semaine et avant chaque semaine contenant un 1er */
-    let lab = ws.getTime()===d0.getTime() ? dateOfKey(k0) : null;
-    for(let i=0;i<7;i++){ const d = new Date(ws); d.setDate(d.getDate()+i); if(d.getDate()===1) lab = d; }
-    if(lab) h += `<div class="mois">${moisLbl(lab)}</div>`;
-    for(let i=0;i<7;i++){
-      const dt = new Date(ws); dt.setDate(dt.getDate()+i);
-      const key = iso(dt);
-      const st = statusOf(key);
-      const dnum = `<span class="dnum">${dt.getDate()}</span>`;
-      if(st==="off" || st==="vide"){
-        h += `<div class="cell aremplir" data-key="${key}" title="${dt.toLocaleDateString("fr-FR")} — à remplir, appuie pour choisir le poste">${dnum}</div>`;
-        continue;
-      }
-      const c = jours[key];
-      const k = ref[c];
-      const type = st==="inconnu" ? null : k.type;
-      let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
-      if(st==="inconnu") cls += " vide";
-      const bg = type ? `background:${TYPES[type].c}` : "";
-      const hr = (st==="ok") ? segsOf(k).map(s=>`<small>${s.debut}${s.fin&&s.fin!==s.debut?"–"+s.fin:""}</small>`).join("") : "";
-      const mark = (st==="sansheure" || st==="inconnu") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
-      const titles = {inconnu:"code inconnu", sansheure:"horaire manquant"};
-      const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "") + " — appuie pour modifier";
-      h += `<div class="${cls}" data-key="${key}" style="${bg}" title="${title}">${dnum}${esc(c)||"·"}${hr}${mark}</div>`;
-    }
-  }
-  return h + "</div>";
-}
-
-function listHtml(k0, k1){
-  const tk = todayKey();
-  let h = '<div class="dlist">';
-  const d1 = dateOfKey(k1);
-  let curMois = "";
-  for(let dt = dateOfKey(k0); dt <= d1; dt.setDate(dt.getDate()+1)){
-    const m = moisLbl(dt);
-    if(m !== curMois){ curMois = m; h += `<div class="lmois">${m}</div>`; }
-    const key = iso(dt);
-    const st = statusOf(key);
-    const c = jours[key];
-    const k = c ? ref[c] : null;
-    let cls = "drow" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
-    const chipBg = (st==="off" || st==="vide" || st==="inconnu") ? "var(--rule);color:var(--ink-soft)" : TYPES[k.type].c;
-    let det = "", lever = "";
-    if(st==="off" || st==="vide") det = `<span style="color:var(--ink-soft)">à remplir — appuie pour choisir le poste</span>`;
-    else if(st==="inconnu")    det = `<span class="warn-t">code inconnu — pas de réveil</span>`;
-    else if(st==="repos" || st==="vacances") det = TYPES[k.type].lbl;
-    else if(st==="sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
-    else{
-      const segs = segsOf(k);
-      det = `${TYPES[k.type].lbl} · ${segs.map(s=>`${s.debut}–${s.fin}${s.alarm?"":" (sans réveil)"}`).join(" · ")}`;
-      const levers = segs.filter(s=>s.alarm).map(s=>{
-        const w = minusMinutes(dt, s.debut, prefs.lead);
-        return `${iso(w)!==key ? "<small>veille</small> " : ""}${pad(w.getHours())}:${pad(w.getMinutes())}`;
-      });
-      lever = levers.length ? `<span class="lever">${levers.join(" · ")}</span>` : "";
-    }
-    h += `<div class="${cls}" data-key="${key}"><span class="ld">${fmtShort(dt)}</span>
-      <span class="chip" style="background:${chipBg}">${esc(c||"")||"·"}</span>
-      <span class="det">${det}</span>${lever}</div>`;
-  }
-  return h + "</div>";
-}
-
-/* ================= onglet Planning ================= */
-function renderPlanning(){
-  const keys = planKeys();
-  const info = $("planInfo"), notes = $("planNotes"), view = $("planView");
-  if(!keys.length){
-    info.textContent = "";
-    notes.innerHTML = "";
-    view.innerHTML = `<p class="msg">Aucun planning pour l'instant — passe par l'onglet Importer.</p>`;
-    return;
-  }
-  const k0 = keys[0], k1 = keys[keys.length-1];
-  /* les semaines passées sont masquées : l'affichage démarre au lundi de la
-     semaine en cours (les données restent là, l'onglet Exporter y accède) */
-  const lundi = new Date(); lundi.setDate(lundi.getDate() - (lundi.getDay()+6)%7);
-  const kMon = iso(lundi);
-  const kStart = (k0 < kMon && k1 >= kMon) ? kMon : k0;
-  const visibles = keys.filter(k => k >= kStart);
-  const masques = keys.length - visibles.length;
-
-  info.innerHTML = `Du <strong>${fmtLong(dateOfKey(kStart))}</strong> au <strong>${fmtLongY(dateOfKey(k1))}</strong>
-    · ${visibles.length} jours`
-    + (masques ? ` <span style="color:var(--ink-soft)">· ${masques} jour${masques>1?"s":""} passé${masques>1?"s":""} masqué${masques>1?"s":""}</span>` : "");
-
-  const miss = visibles.filter(k => ["inconnu","sansheure"].includes(statusOf(k))).length;
-  /* « à remplir » couvre toute la période affichée, trous d'import compris : à
-     l'écran ils ne se distinguent pas d'un jour vide, le compte doit suivre. */
-  let vides = 0;
-  for(let d = dateOfKey(kStart), fin = dateOfKey(k1); d <= fin; d.setDate(d.getDate()+1)){
-    const st = statusOf(iso(d));
-    if(st === "vide" || st === "off") vides++;
-  }
-  const retirables = videsEnFin().length;
-  $("delWeek").disabled = !retirables;
-  $("delWeek").title = retirables
-    ? `Retire les ${retirables} dernier${retirables>1?"s":""} jour${retirables>1?"s":""} à remplir`
-    : "Rien à retirer : le planning ne se termine pas par des jours à remplir";
-  notes.innerHTML =
-    (miss ? `<p class="msg warn">${miss} jour${miss>1?"s":""} sans horaire —
-      complète les codes dans Réglages, sinon pas de réveil ces jours-là.</p>` : "")
-    + (vides ? `<p class="msg">${vides} jour${vides>1?"s":""} à remplir —
-      appuie dessus pour choisir le poste.</p>` : "");
-
-  $("viewGrid").setAttribute("aria-pressed", planMode==="grid");
-  $("viewList").setAttribute("aria-pressed", planMode==="list");
-  view.innerHTML = planMode==="list" ? listHtml(kStart, k1) : gridHtml(kStart, k1);
-  $("gridHint").style.display = planMode==="list" ? "none" : "";  /* visible seulement en grille (et mobile via CSS) */
-
-  view.querySelectorAll("[data-key]").forEach(el=>
-    el.addEventListener("click", ()=> openDayEditor(el.dataset.key)));
-}
-
-$("viewGrid").addEventListener("click", ()=>{ planMode = "grid"; renderPlanning(); });
-$("viewList").addEventListener("click", ()=>{ planMode = "list"; renderPlanning(); });
-$("clearPlan").addEventListener("click", ()=>{
-  if(!Object.keys(jours).length) return;
-  if(!confirm("Effacer tout le planning ?\nLes codes et leurs horaires sont conservés. Les événements déjà envoyés au calendrier ne seront pas retirés.")) return;
-  jours = {}; saveJours(); renderAll();
-});
-
-/* Ajouter une semaine : 7 jours vides après le dernier jour planifié (ou à partir
-   du lundi de cette semaine si le planning est vide). Réappuyer en ajoute d'autres. */
-$("addWeek").addEventListener("click", ()=>{
-  const keys = planKeys();
-  let start;
-  if(keys.length){
-    start = dateOfKey(keys[keys.length-1]); start.setDate(start.getDate()+1);
-  }else{
-    start = new Date(); start.setDate(start.getDate() - (start.getDay()+6)%7);
-  }
-  for(let i=0;i<7;i++){ const k = iso(new Date(start.getFullYear(), start.getMonth(), start.getDate()+i)); if(!(k in jours)) jours[k] = ""; }
-  saveJours();
-  const nk = planKeys();
-  $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
-  renderAll();
-});
-
-/* Symétrique du bouton précédent : retire jusqu'à 7 jours en fin de planning,
-   et uniquement des jours encore à remplir — un jour où un poste est saisi n'est
-   jamais supprimé par ce bouton. */
-const videsEnFin = () => {
-  const k = planKeys();
-  let n = 0;
-  while(n < 7 && k.length - n > 0 && jours[k[k.length-1-n]] === "") n++;
-  return k.slice(k.length - n);
-};
-$("delWeek").addEventListener("click", ()=>{
-  const aRetirer = videsEnFin();
-  if(!aRetirer.length) return;
-  aRetirer.forEach(k => delete jours[k]);
-  saveJours();
-  const nk = planKeys();
-  if(nk.length) $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
-  renderAll();
-});
-
-/* ---------- éditeur d'un jour (clic sur une case) ---------- */
-function openDayEditor(key){
-  const dt = dateOfKey(key);
-  /* liste de tous les codes possibles : la palette standard + ceux déjà utilisés,
-     dédupliqués, sans le code réservé « Vacances » (bouton dédié) */
-  const codesList = [...new Set([...KNOWN_CODES, ...Object.keys(ref)])].filter(c=> c!=="Vacs");
-
-  const ov = document.createElement("div");
-  ov.className = "sheet-ov";
-  const choix = c => {
-    const type = ref[c] ? ref[c].type : guessType(c);
-    const k = ref[c];
-    const info = NOALARM(type) ? TYPES[type].lbl
-      : (k && k.debut ? k.debut + (k.fin?"–"+k.fin:"") : "horaire à régler");
-    return `<button class="daychoice" data-set="${esc(c)}">
-      <span class="chip" style="background:${TYPES[type].c}">${esc(c)}</span>
-      <span>${info}</span></button>`;
-  };
-  ov.innerHTML = `<div class="sheet" role="dialog" aria-label="Modifier le jour">
-    <p class="sheet-h">${fmtLong(dt).replace(/^./,x=>x.toUpperCase())}</p>
-    <div class="daygrid">
-      ${codesList.map(choix).join("")}
-      <button class="daychoice" data-set="Vacs"><span class="chip" style="background:var(--vacances)">V</span><span>Vacs</span></button>
-      <button class="daychoice" data-set=""><span class="chip" style="background:transparent;border:1.5px dashed var(--ink-soft);color:var(--ink-soft)">·</span><span>À remplir</span></button>
-    </div>
-    <div class="btns" style="justify-content:flex-end;margin-top:14px">
-      <button class="ghost" data-annuler="1">Annuler</button>
-      <button data-valider="1">Valider</button>
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-
-  /* etat d'origine et selection en attente : rien n'est ecrit avant Valider.
-     Un jour absent du planning vaut « à remplir » : c'est le même état à l'écran,
-     valider le matérialise sans que l'utilisateur ait à s'en soucier. */
-  const origine = (key in jours) ? jours[key] : "";
-  let pending = origine;
-
-  const close = ()=> ov.remove();
-  const refreshSel = ()=> ov.querySelectorAll("[data-set]").forEach(b=>
-    b.classList.toggle("sel", b.dataset.set === (pending ?? " ")));
-
-  refreshSel();
-  ov.querySelectorAll("[data-set]").forEach(b=>
-    b.addEventListener("click", ()=>{ pending = b.dataset.set; refreshSel(); }));
-
-  ov.querySelector("[data-annuler]").addEventListener("click", close);
-  ov.addEventListener("click", e=>{ if(e.target===ov) close(); });   /* tap hors de la feuille = annuler */
-
-  ov.querySelector("[data-valider]").addEventListener("click", ()=>{
-    if(pending !== origine){
-      const c = pending;
-      if(c==="Vacs" && !ref["Vacs"]){ ref["Vacs"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
-      else if(c && !ref[c]){ ref[c] = newCode(c); saveRef(); }
-      jours[key] = c;
-      saveJours();
-      const nk = planKeys();
-      if(nk.length) $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
-      renderAll();
-    }
-    close();
-  });
-}
-
-/* ================= onglet Export ================= */
-function exportRange(){
-  const a = $("expStart").value, b = $("expEnd").value;
-  if(!a || !b) return null;
-  const k0 = keyOfInput(a), k1 = keyOfInput(b);
-  return k0 <= k1 ? {k0, k1} : null;
-}
-
-function renderExport(){
-  const keys = planKeys();
-  const r = exportRange();
-  if(!keys.length){ $("expInfo").textContent = "Aucun planning à exporter pour l'instant."; return; }
-  if(!r){ $("expInfo").textContent = "Choisis une plage de dates valide (début avant fin)."; return; }
-  const n = keys.filter(k => k>=r.k0 && k<=r.k1).length;
-  $("expInfo").textContent = n
-    ? n + " jour" + (n>1?"s":"") + " planifié" + (n>1?"s":"") + " dans cette plage."
-    : "Aucun jour planifié dans cette plage.";
-}
-
-/* valeurs par défaut : aujourd'hui → dernier jour planifié */
-function setExportDefaults(){
-  const keys = planKeys();
-  if(!keys.length) return;
-  const tk = todayKey();
-  const first = keys.find(k=>k>=tk) || keys[0];
-  if(!$("expStart").value) $("expStart").value = isoInput(dateOfKey(first));
-  if(!$("expEnd").value || keyOfInput($("expEnd").value) < keyOfInput($("expStart").value))
-    $("expEnd").value = isoInput(dateOfKey(keys[keys.length-1]));
-}
-
-/* ---------- export .ics ---------- */
-/* Heures locales flottantes : pas de suffixe Z, pas de conversion UTC, pour que
-   06h00 reste 06h00 des deux côtés du changement d'heure. */
-const escIcs = s => String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
-const icsHead = () => ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Reveils du cycle//FR",
-  "CALSCALE:GREGORIAN","X-WR-CALNAME:" + escIcs(prefs.calName || "Travail")];
-function icsStamp(){
-  const n = new Date();
-  return n.getUTCFullYear()+pad(n.getUTCMonth()+1)+pad(n.getUTCDate())
-    +"T"+pad(n.getUTCHours())+pad(n.getUTCMinutes())+pad(n.getUTCSeconds())+"Z";
-}
-
-function download(txt, name, mime){
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([txt],{type:mime||"text/calendar"}));
-  a.download = name;
-  a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-}
-
-function buildIcs(k0, k1){
-  const out = icsHead();
-  const stamp = icsStamp();
-  const s = {ok:0, evts:0, repos:0, miss:0};
-  planKeys().forEach(key=>{
-    if(key < k0 || key > k1) return;
-    const st = statusOf(key);
-    if(st==="repos" || st==="vacances"){ s.repos++; return; }
-    if(st==="vide"){ return; }                         /* jour à remplir : ni exporté ni « ignoré » */
-    if(st!=="ok"){ s.miss++; return; }
-    const c = jours[key];
-    const k = ref[c];
-    const dt = dateOfKey(key);
-    segsOf(k).forEach((seg,si)=>{
-      const fin = seg.fin || seg.debut;
-      const [dh,dm] = seg.debut.split(":");
-      const [fh,fm] = fin.split(":");
-      const end = new Date(dt);
-      if(fin <= seg.debut) end.setDate(end.getDate()+1);   /* fin le lendemain (nuit / minuit) */
-      const ev = ["BEGIN:VEVENT",
-        "UID:" + key + (si?"-"+si:"") + "@reveils-cycle",
-        "DTSTAMP:" + stamp,
-        "DTSTART:" + key + "T" + dh + dm + "00",
-        "DTEND:"   + iso(end) + "T" + fh + fm + "00",
-        "SUMMARY:" + escIcs(c)];
-      if(seg.alarm){                                        /* réveil seulement sur les créneaux qui sonnent */
-        ev.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:Debout",
-          "TRIGGER:-PT" + (prefs.lead||0) + "M","END:VALARM");
-        s.ok++;
-      }
-      ev.push("END:VEVENT");
-      out.push(...ev);
-      s.evts++;
-    });
-  });
-  out.push("END:VCALENDAR");
-  return {txt: out.join("\r\n"), s};
-}
-
-function doExport(versGoogle){
-  const r = exportRange();
-  if(!r){ $("exportMsg").innerHTML = `<p class="msg warn">Choisis une plage de dates valide.</p>`; return; }
-  const {txt, s} = buildIcs(r.k0, r.k1);
-  if(!s.evts){
-    $("exportMsg").innerHTML = `<p class="msg warn">Aucun poste exploitable dans cette plage — vérifie les dates et les horaires dans Réglages.</p>`;
-    return;
-  }
-  const parts = [`<strong>${s.evts} poste${s.evts>1?"s":""} exporté${s.evts>1?"s":""}</strong> · ${s.ok} réveil${s.ok>1?"s":""}`];
-  if(s.repos) parts.push(`${s.repos} jour${s.repos>1?"s":""} sans réveil (repos, vacances)`);
-  if(s.miss)  parts.push(`<strong>${s.miss} jour${s.miss>1?"s":""} ignoré${s.miss>1?"s":""} faute d'horaire</strong>`);
-  let em = `<p class="msg ${s.miss ? "warn" : "ok"}">${parts.join(" · ")}.</p>`;
-
-  const cal = esc(prefs.calName || "Travail");
-  if(versGoogle){
-    em += `<p class="msg">Pour Google Agenda, avec le fichier téléchargé&nbsp;:<br>
-      1. Sur <a href="https://calendar.google.com" target="_blank" rel="noopener">calendar.google.com</a>,
-      crée une fois le calendrier «&nbsp;${cal}&nbsp;» (Autres agendas → +).<br>
-      2. Ouvre <a href="https://calendar.google.com/calendar/u/0/r/settings/export" target="_blank" rel="noopener">Paramètres
-      → Importer et exporter</a>.<br>
-      3. Choisis le fichier et le calendrier «&nbsp;${cal}&nbsp;», puis Importer.</p>`;
-  }else{
-    em += `<p class="msg">À l'ouverture du fichier sur iPhone, ajoute les événements au calendrier
-      «&nbsp;${cal}&nbsp;».</p>`;
-  }
-  $("exportMsg").innerHTML = em;
-  download(txt, "reveils-" + $("expStart").value + "_" + $("expEnd").value + ".ics");
-}
-
-/* ---------- export PDF : vue imprimable + boîte d'impression ---------- */
-function doPdf(mode){
-  const r = exportRange();
-  if(!r){ $("exportMsg").innerHTML = `<p class="msg warn">Choisis une plage de dates valide.</p>`; return; }
-  $("printArea").innerHTML =
-    `<h1>Réveils du cycle</h1>
-     <p class="psub">Du ${fmtLong(dateOfKey(r.k0))} au ${fmtLongY(dateOfKey(r.k1))} · lever ${prefs.lead} min avant la prise de poste</p>`
-    + (mode==="list" ? listHtml(r.k0, r.k1) : gridHtml(r.k0, r.k1));
-  const old = document.title;
-  document.title = "planning-" + $("expStart").value + "_" + $("expEnd").value;
-  window.print();
-  document.title = old;
-}
-
-$("expIcs").addEventListener("click", ()=> doExport(false));
-$("expGcal").addEventListener("click", ()=> doExport(true));
-$("expPdfGrid").addEventListener("click", ()=> doPdf("grid"));
-$("expPdfList").addEventListener("click", ()=> doPdf("list"));
-$("expStart").addEventListener("change", renderExport);
-$("expEnd").addEventListener("change", renderExport);
-
-/* ---------- sauvegarde .json ---------- */
-const backupPayload = () => JSON.stringify({v:VERSION, codes:ref, jours, prefs}, null, 1);
-$("expJson").addEventListener("click", ()=>
-  download(backupPayload(), "reveils-donnees-" + isoInput(new Date()) + ".json", "application/json"));
-$("impJsonBtn").addEventListener("click", ()=> $("impJson").click());
-$("impJson").addEventListener("change", async e=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  try{
-    const s = JSON.parse(await file.text());
-    if(!s || typeof s !== "object" || (!s.codes && !s.jours && !s.plannings)) throw new Error("format");
-    Object.assign(ref, s.codes || {});
-    Object.assign(jours, s.jours || {});
-    /* anciens fichiers (v2) : les cycles sont aplatis, le plus récent collage gagne */
-    if(Array.isArray(s.plannings))
-      [...s.plannings].sort((a,b)=>(a.creeLe||0)-(b.creeLe||0)).forEach(p=>
-        (p.codes||[]).forEach((c,i)=>{ jours[iso(addDays(p.dateDebut,i))] = c; }));
-    if(s.prefs) prefs = Object.assign({lead:45, calName:"Travail"}, s.prefs);
-    migrate();
-    saveRef(); saveJours(); savePrefs();
-    $("lead").value = prefs.lead;
-    $("calName").value = prefs.calName;
-    renderAll();
-    $("backupMsg").innerHTML = '<p class="msg ok">Données importées.</p>';
-  }catch(err){
-    $("backupMsg").innerHTML = '<p class="msg warn">Fichier illisible — utilise un fichier exporté depuis l\'appli.</p>';
-  }
-  e.target.value = "";
-});
-
-/* ---------- synchronisation avec la base Supabase ---------- */
-/* Le planning est réparti en lignes : une par jour, une par code. On n'envoie que
-   ce qui a bougé depuis le dernier état connu de la base (srvRef/srvJours/srvPrefs),
-   ce qui permet à deux personnes de modifier deux jours différents en même temps
-   sans que l'une écrase l'autre. */
-
-function setSyncStatus(txt, warn){
-  const el = $("syncStatus");
-  el.textContent = txt;
-  el.style.color = warn ? "#7A5310" : "";
-}
-const hhmm = () => new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
-
-/* --- conversions entre le format de l'appli et celui de la base --- */
-const hm      = t => t ? String(t).slice(0,5) : "";          /* "08:00:00" → "08:00" */
-const tOrNull = t => t ? t : null;                            /* ""        → NULL    */
-const cleOf   = d => String(d).replaceAll("-","");            /* "2026-07-27" → "20260727" */
-const dateOf  = k => k.slice(0,4)+"-"+k.slice(4,6)+"-"+k.slice(6,8);
-
-const ligneCode = (c,k) => ({
-  code:c, libelle:k.libelle||"", type:k.type,
-  debut:tOrNull(k.debut), fin:tOrNull(k.fin),
-  debut2:tOrNull(k.debut2), fin2:tOrNull(k.fin2),
-  no_reveil1: !!k.noReveil1
-});
-function codeDeLigne(r){
-  const k = {libelle:r.libelle||"", type:r.type, debut:hm(r.debut), fin:hm(r.fin)};
-  /* debut2 n'est ajouté que s'il existe : l'affichage teste « "debut2" in k »
-     pour décider de montrer la ligne du 2e créneau. */
-  if(r.debut2){ k.debut2 = hm(r.debut2); k.fin2 = hm(r.fin2); }
-  if(r.no_reveil1) k.noReveil1 = true;
-  return k;
-}
-
-/* --- lecture --- */
-async function pullRemote(){
-  const [rc, rj, rp] = await Promise.all([
-    sb.from("poste_code").select("*"),
-    sb.from("poste_jour").select("jour, code"),
-    sb.from("reglage").select("cle, valeur")
-  ]);
-  for(const r of [rc, rj, rp]) if(r.error) throw r.error;
-
-  applying = true;
-  ref = {};   rc.data.forEach(r => ref[r.code] = codeDeLigne(r));
-  jours = {}; rj.data.forEach(r => jours[cleOf(r.jour)] = r.code || "");
-  prefs = Object.assign({lead:45, calName:"Travail"},
-            Object.fromEntries(rp.data.map(r => [r.cle, r.valeur])));
-
-  migrate();
-  /* Photo de ce que contient la base, pour calculer les écarts au prochain envoi.
-     Prise AVANT la purge : les jours de plus de 90 jours apparaissent ainsi comme
-     retirés, et l'envoi suivant les efface aussi de la base — sinon ils s'y
-     accumuleraient sans fin. */
-  srvRef   = JSON.parse(JSON.stringify(ref));
-  srvJours = Object.assign({}, jours);
-  srvPrefs = Object.assign({}, prefs);
-  const purge = pruneJours(jours);
-
-  store.set("cycle:codes", wrap(ref));
-  store.set("cycle:jours", wrap(jours));
-  store.set("cycle:prefs", wrap(prefs));
-  applying = false;
-  if(purge) scheduleSync();   /* après applying : sinon l'envoi serait ignoré */
-
-  $("lead").value = prefs.lead;
-  $("calName").value = prefs.calName;
-  renderAll();
-}
-
-/* --- écriture : uniquement les écarts --- */
-async function pushRemote(){
-  const meme = (a,b) => JSON.stringify(a) === JSON.stringify(b);
-
-  const codesAjout = Object.keys(ref).filter(c => !meme(ref[c], srvRef[c])).map(c => ligneCode(c, ref[c]));
-  const codesRetir = Object.keys(srvRef).filter(c => !(c in ref));
-  const joursAjout = Object.keys(jours).filter(k => jours[k] !== srvJours[k])
-                       .map(k => ({jour:dateOf(k), code: jours[k] || null}));
-  const joursRetir = Object.keys(srvJours).filter(k => !(k in jours)).map(dateOf);
-  const reglAjout  = ["lead","calName"].filter(c => !meme(prefs[c], srvPrefs[c]))
-                       .map(c => ({cle:c, valeur:prefs[c]}));
-
-  if(!codesAjout.length && !codesRetir.length && !joursAjout.length
-     && !joursRetir.length && !reglAjout.length) return false;
-
-  /* ordre imposé par la clé étrangère : un jour ne peut pointer que vers un code
-     qui existe déjà, et un code ne se supprime qu'une fois ses jours réglés. */
-  const etapes = [
-    codesAjout.length && sb.from("poste_code").upsert(codesAjout),
-    joursRetir.length && sb.from("poste_jour").delete().in("jour", joursRetir),
-    joursAjout.length && sb.from("poste_jour").upsert(joursAjout),
-    codesRetir.length && sb.from("poste_code").delete().in("code", codesRetir),
-    reglAjout.length  && sb.from("reglage").upsert(reglAjout)
-  ].filter(Boolean);
-  for(const e of etapes){ const {error} = await e; if(error) throw error; }
-
-  srvRef   = JSON.parse(JSON.stringify(ref));
-  srvJours = Object.assign({}, jours);
-  srvPrefs = Object.assign({}, prefs);
-  return true;
-}
-
-function scheduleSync(){
-  if(!session || applying) return;
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(()=>{ syncTimer = null; syncNow(); }, 1500);
-}
-
-async function syncNow(lireAussi){
-  if(!session || syncBusy) return;
-  syncBusy = true;
-  try{
-    if(lireAussi) await pullRemote();
-    const envoye = await pushRemote();
-    setSyncStatus(envoye ? "Enregistré pour tout le monde à " + hhmm() + "." : "À jour (" + hhmm() + ").");
-  }catch(e){
-    if(!navigator.onLine)
-      setSyncStatus("Hors ligne — tes modifications sont gardées ici et partiront au retour du réseau.", true);
-    else if(e && (e.code === "42501" || String(e.message||"").includes("row-level security")))
-      setSyncStatus("Ton compte n'a pas le droit de modifier le planning (rôle « enfant »).", true);
-    else
-      setSyncStatus("Enregistrement impossible (" + (e.message||e) + ") — nouvel essai plus tard.", true);
-  }
-  syncBusy = false;
-}
-
-/* --- temps réel : la modification d'un autre appareil arrive toute seule --- */
-function ecouterTempsReel(){
-  if(canalTemsReel) return;
-  canalTemsReel = sb.channel("planning")
-    .on("postgres_changes", {event:"*", schema:"public"}, ()=>{
-      clearTimeout(syncTimer);
-      syncTimer = setTimeout(()=>{ syncTimer = null; syncNow(true); }, 800);
-    })
-    .subscribe();
-}
-
-/* ---------- connexion ---------- */
-async function chargerProfil(){
-  const {data} = await sb.from("profil").select("prenom, role").eq("id", session.user.id).single();
-  moi = data;
-}
-
-async function connexionEnvoyer(){
-  const mail = $("authMail").value.trim();
-  if(!mail) return;
-  $("authBtn").disabled = true;
-  const {error} = await sb.auth.signInWithOtp({
-    email: mail,
-    options:{emailRedirectTo: location.href.split("#")[0]}
-  });
-  $("authBtn").disabled = false;
-  $("authMsg").innerHTML = error
-    ? `<p class="msg warn">${esc(error.message)}</p>`
-    : `<p class="msg ok">Lien envoyé à ${esc(mail)}. Ouvre-le depuis cet appareil — il te ramènera ici, connecté.</p>`;
-}
-
-function renderSyncUI(){
-  $("syncInfo").innerHTML = moi
-    ? `Connectée en tant que <strong>${esc(moi.prenom)}</strong>${moi.role==="enfant" ? " (lecture seule)" : ""}.
-       Le planning est partagé avec les autres comptes du foyer et se met à jour tout seul.`
-    : "Non connectée.";
-  $("syncCfg").hidden = !session;
-}
-
-$("syncNowBtn").addEventListener("click", ()=> syncNow(true));
-$("deconnexion").addEventListener("click", async ()=>{
-  if(!confirm("Se déconnecter de cet appareil ?")) return;
-  await sb.auth.signOut();
-  location.reload();
-});
-
-/* ---------- rendu global & navigation ---------- */
-function renderAll(){
-  renderImporter();
-  renderCodes();
-  renderNext();
-  renderPlanning();
-  setExportDefaults();
-  renderExport();
-}
-
-function showTab(name){
-  document.querySelectorAll(".tab").forEach(s=> s.hidden = s.dataset.tab !== name);
-  document.querySelectorAll(".tabs button").forEach(b=>
-    b.setAttribute("aria-current", b.dataset.tab === name ? "page" : "false"));
-  window.scrollTo(0,0);
-}
-document.querySelectorAll(".tabs button").forEach(b=>
-  b.addEventListener("click", ()=> showTab(b.dataset.tab)));
-
-$("line").addEventListener("input", ()=>{ $("saveMsg").innerHTML=""; renderImporter(); });
-$("start").addEventListener("change", renderImporter);
-$("saveCycle").addEventListener("click", saveCycle);
-$("lead").addEventListener("input", ()=>{
-  prefs.lead = Math.max(0, parseInt($("lead").value)||0);
-  savePrefs(); renderNext(); renderPlanning();
-});
-$("calName").addEventListener("change", ()=>{
-  prefs.calName = $("calName").value.trim() || "Travail";
-  savePrefs();
-});
-
-/* ---------- chargement + migrations ---------- */
-$("authBtn").addEventListener("click", connexionEnvoyer);
-$("authMail").addEventListener("keydown", e=>{ if(e.key==="Enter") connexionEnvoyer(); });
-
-(async ()=>{
-  const rawC = await store.get("cycle:codes");
-  const rawJ = await store.get("cycle:jours");
-  const rawF = await store.get("cycle:prefs");
-
-  if(rawC) ref = unwrap(rawC) || {};
-  if(rawJ) jours = unwrap(rawJ) || {};
-  if(rawF) prefs = Object.assign({lead:45, calName:"Travail"}, unwrap(rawF));
-
-  /* Migration v2 → v3 : les cycles empilés deviennent un seul planning,
-     le plus récent collage gagne sur les dates communes. Uniquement si
-     cycle:jours n'existe pas encore ; l'ancienne clé est laissée en place. */
-  if(rawJ === null){
-    const rawP = await store.get("cycle:plannings");
-    if(rawP){
-      const plannings = unwrap(rawP);
-      if(Array.isArray(plannings)){
-        [...plannings].sort((a,b)=>(a.creeLe||0)-(b.creeLe||0)).forEach(p=>
-          (p.codes||[]).forEach((c,i)=>{ jours[iso(addDays(p.dateDebut,i))] = c; }));
-        saveJours();
-      }
-    }
-  }
-
-  /* Migration v1 : référentiel des codes, si aucun référentiel v2/v3 */
-  if(rawC === null){
-    const v1 = await store.get("cycle:v1");
-    if(v1){ try{
-      const s = JSON.parse(v1);
-      Object.entries(s.codes || {}).forEach(([c,k])=>{
-        ref[c] = {libelle:"", type:k.type || guessType(c), debut:k.debut||"", fin:k.fin||""};
-      });
-      if(s.lead != null) prefs.lead = parseInt(s.lead) || 45;
-      saveRef(); savePrefs();
-    }catch(e){} }
-  }
-
-  /* mise en conformité + ménage silencieux : on écrit directement (sans bump)
-     pour ne pas compter comme une modification locale — chaque appareil fait pareil */
-  const changed = migrate();
-  if(changed) store.set("cycle:codes", wrap(ref));
-  if(pruneJours(jours) || changed) store.set("cycle:jours", wrap(jours));
-
-  /* date de début proposée : lendemain du dernier jour planifié, sinon aujourd'hui */
-  const keys = planKeys();
-  if(keys.length){
-    const last = dateOfKey(keys[keys.length-1]);
-    last.setDate(last.getDate()+1);
-    $("start").value = isoInput(last);
-  }else{
-    $("start").value = isoInput(new Date());
-  }
-  $("lead").value = prefs.lead;
-  $("calName").value = prefs.calName;
-
-  renderAll();
-  showTab("planning");
-
-  /* Le cache local s'affiche tout de suite ; la base prend le relais dès que la
-     session est connue. Un appareil déjà connecté ne revoit jamais l'écran de
-     connexion, y compris hors réseau. */
-  const {data:{session:s0}} = await sb.auth.getSession();
-  await ouvrirSession(s0);
-
-  sb.auth.onAuthStateChange(async (_ev, s)=>{
-    if(s && !session) await ouvrirSession(s);
-    else if(!s && session){ session = null; moi = null; montrerEcrans(); }
-  });
-
-  window.addEventListener("online", ()=> syncNow(true));
-  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) syncNow(true); });
-})();
-
-function montrerEcrans(){
-  $("authEcran").hidden    = !!session;
-  $("appEcran").hidden     = !session;
-  $("barreOnglets").hidden = !session;
-}
-
-async function ouvrirSession(s){
-  session = s || null;
-  montrerEcrans();
-  if(!session) return;
-  /* l'adresse garde le jeton du lien de connexion : on la nettoie */
-  if(location.hash.includes("access_token"))
-    history.replaceState(null, "", location.pathname + location.search);
-  try{
-    await chargerProfil();
-    renderSyncUI();
-    await syncNow(true);
-    ecouterTempsReel();
-  }catch(e){
-    setSyncStatus("Connexion à la base impossible — l'appli fonctionne avec la copie de cet appareil.", true);
-  }
-}
-</script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
