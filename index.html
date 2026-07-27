@@ -24,6 +24,9 @@
     --vacances:#1C93A0;
   }
   *{box-sizing:border-box}
+  /* « hidden » doit gagner : plusieurs règles plus bas imposent un display
+     (flex, grid…) qui, sinon, laisse l'élément visible malgré l'attribut. */
+  [hidden]{display:none !important}
   body{margin:0;background:var(--paper);color:var(--ink);
     font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
     font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
@@ -98,7 +101,10 @@
   .cell .dnum{position:absolute;top:2px;left:3px;font-size:8.5px;font-weight:600;opacity:.75}
   .cell.past{opacity:.55}
   .cell.today{box-shadow:inset 0 0 0 2.5px var(--ink)}
-  .cell.off{background:transparent;border:1px dashed var(--rule);color:var(--ink-soft)}
+  /* Un jour sans poste, qu'il ait ou non une ligne en base : un seul état visible,
+     « à remplir ». La distinction interne ne regarde pas l'utilisateur. */
+  .cell.aremplir{background:transparent;border:1.5px dashed var(--ink-soft);color:var(--ink-soft)}
+  .cell.aremplir::after{content:"·";font-size:19px;line-height:0;opacity:.75}
   .cell[data-key]{cursor:pointer}
   .drow[data-key]{cursor:pointer}
   @media (hover:hover){ .cell[data-key]:hover{filter:brightness(1.06)} .drow[data-key]:hover{background:#F3F6F8} }
@@ -187,7 +193,26 @@
 </head>
 <body>
 
-<div class="wrap">
+<!-- ======== écran de connexion (masqué une fois la session ouverte) ======== -->
+<div id="authEcran" hidden>
+  <div class="wrap" style="max-width:420px;padding-top:56px">
+    <h1>Planning famille</h1>
+    <p class="sub">Connexion par lien reçu par mail — une seule fois par appareil.</p>
+    <div class="step">
+      <label for="authMail">Ton adresse mail</label>
+      <input type="email" id="authMail" autocomplete="email" inputmode="email"
+             placeholder="prenom@exemple.fr">
+      <div class="row">
+        <button id="authBtn">Recevoir le lien</button>
+      </div>
+      <div id="authMsg"></div>
+      <p class="hint">Pas de mot de passe à retenir. Le lien ouvre l'appli déjà connectée,
+        et l'appareil reste connecté ensuite.</p>
+    </div>
+  </div>
+</div>
+
+<div class="wrap" id="appEcran" hidden>
   <div id="next"></div>
 
   <!-- ======== onglet Importer ======== -->
@@ -207,8 +232,9 @@
       </div>
       <div id="saveMsg"></div>
     </div>
-    <p class="foot">Tout se calcule dans ton navigateur. Ta ligne ne part sur aucun serveur.<br>
-    Les données restent sur cet appareil&nbsp;— utilise Réglages → Sauvegarde pour les transporter.</p>
+    <p class="foot">Le planning importé est partagé avec les autres comptes du foyer&nbsp;:
+    inutile de refaire l'import sur chaque appareil.<br>
+    Chaque appareil garde une copie pour l'affichage hors réseau.</p>
   </section>
 
   <!-- ======== onglet Planning ======== -->
@@ -226,6 +252,7 @@
       <p class="hint" id="planTip" style="margin-top:12px">Appuie sur un jour pour le modifier à la main.</p>
       <div class="btns">
         <button class="ghost" id="addWeek">+ Ajouter une semaine</button>
+        <button class="ghost" id="delWeek">− Retirer une semaine</button>
         <button class="ghost danger" id="clearPlan">Effacer le planning</button>
       </div>
     </div>
@@ -282,14 +309,12 @@
         choisis ou crée le sous-calendrier du même nom — «&nbsp;Travail&nbsp;», «&nbsp;Planning Fab&nbsp;»…</p>
     </div>
     <div class="step">
-      <h2>Synchronisation</h2>
+      <h2>Compte et synchronisation</h2>
       <p class="hint" id="syncInfo" style="margin:0 0 10px"></p>
       <div id="syncCfg" hidden>
-        <label for="ghToken">Jeton GitHub — seulement sur l'appareil qui modifie le planning</label>
-        <input type="password" id="ghToken" placeholder="github_pat_… ou ghp_…" autocomplete="off">
-        <div class="row">
-          <button class="ghost" id="tokenSave">Enregistrer le jeton</button>
+        <div class="row" style="margin-top:0">
           <button id="syncNowBtn">Synchroniser maintenant</button>
+          <button class="ghost danger" id="deconnexion">Se déconnecter</button>
         </div>
       </div>
       <p class="hint" id="syncStatus" aria-live="polite"></p>
@@ -311,7 +336,9 @@
 
 <div id="printArea"></div>
 
-<nav class="tabs" aria-label="Navigation">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
+
+<nav class="tabs" id="barreOnglets" aria-label="Navigation" hidden>
   <button data-tab="planning" aria-current="false">Planning</button>
   <button data-tab="importer" aria-current="false">Importer</button>
   <button data-tab="export" aria-current="false">Exporter</button>
@@ -322,21 +349,22 @@
 "use strict";
 
 /* ===== synchronisation =====
-   Le planning partagé vit dans un fichier data.json à la racine du dépôt GitHub
-   qui héberge le site. Hébergé sur GitHub Pages, le dépôt est déduit tout seul
-   de l'adresse — rien à configurer. Hébergé ailleurs (Scaleway…), renseigner
-   SYNC_REPO_CFG sous la forme "compte/depot". Vide et hors GitHub Pages :
-   pas de synchro, tout reste local. */
-const SYNC_REPO_CFG = "";
-const SYNC_BRANCH   = "main";
-const SYNC_PATH     = "data.json";
+   Les données vivent dans une base Supabase privée : une ligne par jour, une par
+   code. Chaque membre du foyer a un compte ; seuls les adultes écrivent. Deux
+   personnes peuvent modifier en même temps sans s'écraser — contrairement au
+   fichier unique d'avant, la comparaison se fait ligne par ligne.
 
-let SYNC_REPO = SYNC_REPO_CFG;
-if(!SYNC_REPO && location.hostname.endsWith(".github.io")){
-  const owner = location.hostname.split(".")[0];
-  const seg = location.pathname.split("/").filter(s=>s && !s.endsWith(".html"));
-  SYNC_REPO = owner + "/" + (seg.length ? seg[0] : owner + ".github.io");
-}
+   La clé ci-dessous est PUBLIQUE par conception (« publishable ») : elle ne donne
+   accès à rien sans compte, c'est la sécurité au niveau des lignes, côté base, qui
+   protège. Ne jamais mettre ici la clé « service_role », qui contourne tout. */
+const SB_URL = "https://fjhmzcvivomqyyyemvny.supabase.co";
+const SB_KEY = "sb_publishable_X8_UhCVsZC0hd6QipbtnZA_FOECka0X";
+
+const sb = window.supabase.createClient(SB_URL, SB_KEY, {
+  auth: {persistSession:true, autoRefreshToken:true, detectSessionInUrl:true}
+});
+let session = null;    // session Supabase, null tant qu'on n'est pas connecté
+let moi = null;        // ligne « profil » du compte connecté
 
 /* ---------- stockage, tolérant à l'environnement ---------- */
 const store = {
@@ -380,11 +408,9 @@ let prefs = {lead:45, calName:"Travail"};
 let pasteCells = []; // codes découpés de l'onglet Importer
 let planMode = "grid"; // vue du planning : "grid" | "list"
 
-/* synchro */
-let meta = {majLe:0};  // horodatage du dernier changement local (clé cycle:meta)
-let ghToken = "";      // jeton GitHub, stocké localement, seulement sur l'appareil éditeur
-let syncSha = null;    // sha du data.json distant, nécessaire pour écrire
-let syncTimer = null, syncBusy = false, applying = false, lastPull = 0;
+/* synchro : dernier état connu de la base, pour n'envoyer que ce qui a changé */
+let srvRef = {}, srvJours = {}, srvPrefs = {};
+let syncTimer = null, syncBusy = false, applying = false, canalTemsReel = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
@@ -396,21 +422,13 @@ function unwrap(raw){
   try{ const o = JSON.parse(raw); return (o && typeof o==="object" && "data" in o) ? o.data : o; }
   catch(e){ return null; }
 }
-/* Tout enregistrement local marque un changement (majLe) et programme une synchro,
-   sauf quand on est en train d'appliquer des données reçues du dépôt. */
-function bump(){
-  if(applying) return;
-  /* toujours strictement après le dernier état appliqué, même si les horloges
-     des appareils divergent — sinon une modif locale se ferait écraser */
-  meta.majLe = Math.max(Date.now(), (meta.majLe||0) + 1);
-  store.set("cycle:meta", wrap(meta));
-  scheduleSync();
-}
+/* Tout enregistrement écrit le cache local (affichage immédiat, y compris hors
+   réseau) puis programme un envoi vers la base — sauf quand on est justement en
+   train d'appliquer des données reçues d'elle. */
+function bump(){ if(!applying) scheduleSync(); }
 const saveRef   = () => { store.set("cycle:codes", wrap(ref)); bump(); };
 const saveJours = () => { store.set("cycle:jours", wrap(jours)); bump(); };
 const savePrefs = () => { store.set("cycle:prefs", wrap(prefs)); bump(); };
-const saveMeta  = () => store.set("cycle:meta", wrap(meta));
-const saveToken = () => store.set("cycle:token", wrap(ghToken));
 
 /* ---------- découpage de la ligne ---------- */
 /* Cellule d'en-tête : contient un espace ou dépasse 4 caractères (nom, mention de
@@ -741,7 +759,7 @@ function gridHtml(k0, k1){
       const st = statusOf(key);
       const dnum = `<span class="dnum">${dt.getDate()}</span>`;
       if(st==="off" || st==="vide"){
-        h += `<div class="cell off" data-key="${key}" title="${dt.toLocaleDateString("fr-FR")} — appuie pour remplir">${dnum}</div>`;
+        h += `<div class="cell aremplir" data-key="${key}" title="${dt.toLocaleDateString("fr-FR")} — à remplir, appuie pour choisir le poste">${dnum}</div>`;
         continue;
       }
       const c = jours[key];
@@ -775,7 +793,7 @@ function listHtml(k0, k1){
     let cls = "drow" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
     const chipBg = (st==="off" || st==="vide" || st==="inconnu") ? "var(--rule);color:var(--ink-soft)" : TYPES[k.type].c;
     let det = "", lever = "";
-    if(st==="off" || st==="vide") det = `<span style="color:var(--ink-soft)">à remplir — appuie</span>`;
+    if(st==="off" || st==="vide") det = `<span style="color:var(--ink-soft)">à remplir — appuie pour choisir le poste</span>`;
     else if(st==="inconnu")    det = `<span class="warn-t">code inconnu — pas de réveil</span>`;
     else if(st==="repos" || st==="vacances") det = TYPES[k.type].lbl;
     else if(st==="sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
@@ -819,7 +837,18 @@ function renderPlanning(){
     + (masques ? ` <span style="color:var(--ink-soft)">· ${masques} jour${masques>1?"s":""} passé${masques>1?"s":""} masqué${masques>1?"s":""}</span>` : "");
 
   const miss = visibles.filter(k => ["inconnu","sansheure"].includes(statusOf(k))).length;
-  const vides = visibles.filter(k => statusOf(k)==="vide").length;
+  /* « à remplir » couvre toute la période affichée, trous d'import compris : à
+     l'écran ils ne se distinguent pas d'un jour vide, le compte doit suivre. */
+  let vides = 0;
+  for(let d = dateOfKey(kStart), fin = dateOfKey(k1); d <= fin; d.setDate(d.getDate()+1)){
+    const st = statusOf(iso(d));
+    if(st === "vide" || st === "off") vides++;
+  }
+  const retirables = videsEnFin().length;
+  $("delWeek").disabled = !retirables;
+  $("delWeek").title = retirables
+    ? `Retire les ${retirables} dernier${retirables>1?"s":""} jour${retirables>1?"s":""} à remplir`
+    : "Rien à retirer : le planning ne se termine pas par des jours à remplir";
   notes.innerHTML =
     (miss ? `<p class="msg warn">${miss} jour${miss>1?"s":""} sans horaire —
       complète les codes dans Réglages, sinon pas de réveil ces jours-là.</p>` : "")
@@ -860,6 +889,25 @@ $("addWeek").addEventListener("click", ()=>{
   renderAll();
 });
 
+/* Symétrique du bouton précédent : retire jusqu'à 7 jours en fin de planning,
+   et uniquement des jours encore à remplir — un jour où un poste est saisi n'est
+   jamais supprimé par ce bouton. */
+const videsEnFin = () => {
+  const k = planKeys();
+  let n = 0;
+  while(n < 7 && k.length - n > 0 && jours[k[k.length-1-n]] === "") n++;
+  return k.slice(k.length - n);
+};
+$("delWeek").addEventListener("click", ()=>{
+  const aRetirer = videsEnFin();
+  if(!aRetirer.length) return;
+  aRetirer.forEach(k => delete jours[k]);
+  saveJours();
+  const nk = planKeys();
+  if(nk.length) $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
+  renderAll();
+});
+
 /* ---------- éditeur d'un jour (clic sur une case) ---------- */
 function openDayEditor(key){
   const dt = dateOfKey(key);
@@ -883,8 +931,7 @@ function openDayEditor(key){
     <div class="daygrid">
       ${codesList.map(choix).join("")}
       <button class="daychoice" data-set="Vacs"><span class="chip" style="background:var(--vacances)">V</span><span>Vacs</span></button>
-      <button class="daychoice" data-set="__REMOVE__"><span class="chip" style="background:var(--rule);color:var(--ink-soft)">✕</span><span>Retirer du planning</span></button>
-      <button class="daychoice" data-set=""><span class="chip" style="background:var(--rule);color:var(--ink-soft)">·</span><span>Vide (à remplir)</span></button>
+      <button class="daychoice" data-set=""><span class="chip" style="background:transparent;border:1.5px dashed var(--ink-soft);color:var(--ink-soft)">·</span><span>À remplir</span></button>
     </div>
     <div class="btns" style="justify-content:flex-end;margin-top:14px">
       <button class="ghost" data-annuler="1">Annuler</button>
@@ -893,8 +940,10 @@ function openDayEditor(key){
   </div>`;
   document.body.appendChild(ov);
 
-  /* etat d'origine et selection en attente : rien n'est ecrit avant Valider */
-  const origine = (key in jours) ? jours[key] : "__OFF__";
+  /* etat d'origine et selection en attente : rien n'est ecrit avant Valider.
+     Un jour absent du planning vaut « à remplir » : c'est le même état à l'écran,
+     valider le matérialise sans que l'utilisateur ait à s'en soucier. */
+  const origine = (key in jours) ? jours[key] : "";
   let pending = origine;
 
   const close = ()=> ov.remove();
@@ -910,14 +959,10 @@ function openDayEditor(key){
 
   ov.querySelector("[data-valider]").addEventListener("click", ()=>{
     if(pending !== origine){
-      if(pending === "__REMOVE__"){
-        delete jours[key];
-      }else{
-        const c = pending;
-        if(c==="Vacs" && !ref["Vacs"]){ ref["Vacs"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
-        else if(c && !ref[c]){ ref[c] = newCode(c); saveRef(); }
-        jours[key] = c;
-      }
+      const c = pending;
+      if(c==="Vacs" && !ref["Vacs"]){ ref["Vacs"] = {libelle:"", type:"vacances", debut:"", fin:""}; saveRef(); }
+      else if(c && !ref[c]){ ref[c] = newCode(c); saveRef(); }
+      jours[key] = c;
       saveJours();
       const nk = planKeys();
       if(nk.length) $("expEnd").value = isoInput(dateOfKey(nk[nk.length-1]));
@@ -1096,14 +1141,11 @@ $("impJson").addEventListener("change", async e=>{
   e.target.value = "";
 });
 
-/* ---------- synchronisation via data.json dans le dépôt du site ---------- */
-/* Tous les appareils LISENT le fichier automatiquement (aucune configuration).
-   Seul l'appareil où un jeton est enregistré ÉCRIT, via l'API GitHub.
-   L'état est comparé par horodatage majLe : le plus récent gagne en bloc. */
-const b64e = s => btoa(unescape(encodeURIComponent(s)));
-const b64d = s => decodeURIComponent(escape(atob(String(s).replace(/\s/g,""))));
-const syncPayload = () => JSON.stringify({v:VERSION, majLe:meta.majLe, codes:ref, jours, prefs}, null, 1);
-const apiUrl = () => "https://api.github.com/repos/" + SYNC_REPO + "/contents/" + SYNC_PATH;
+/* ---------- synchronisation avec la base Supabase ---------- */
+/* Le planning est réparti en lignes : une par jour, une par code. On n'envoie que
+   ce qui a bougé depuis le dernier état connu de la base (srvRef/srvJours/srvPrefs),
+   ce qui permet à deux personnes de modifier deux jours différents en même temps
+   sans que l'une écrase l'autre. */
 
 function setSyncStatus(txt, warn){
   const el = $("syncStatus");
@@ -1112,127 +1154,164 @@ function setSyncStatus(txt, warn){
 }
 const hhmm = () => new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"});
 
-function applyRemote(s){
+/* --- conversions entre le format de l'appli et celui de la base --- */
+const hm      = t => t ? String(t).slice(0,5) : "";          /* "08:00:00" → "08:00" */
+const tOrNull = t => t ? t : null;                            /* ""        → NULL    */
+const cleOf   = d => String(d).replaceAll("-","");            /* "2026-07-27" → "20260727" */
+const dateOf  = k => k.slice(0,4)+"-"+k.slice(4,6)+"-"+k.slice(6,8);
+
+const ligneCode = (c,k) => ({
+  code:c, libelle:k.libelle||"", type:k.type,
+  debut:tOrNull(k.debut), fin:tOrNull(k.fin),
+  debut2:tOrNull(k.debut2), fin2:tOrNull(k.fin2),
+  no_reveil1: !!k.noReveil1
+});
+function codeDeLigne(r){
+  const k = {libelle:r.libelle||"", type:r.type, debut:hm(r.debut), fin:hm(r.fin)};
+  /* debut2 n'est ajouté que s'il existe : l'affichage teste « "debut2" in k »
+     pour décider de montrer la ligne du 2e créneau. */
+  if(r.debut2){ k.debut2 = hm(r.debut2); k.fin2 = hm(r.fin2); }
+  if(r.no_reveil1) k.noReveil1 = true;
+  return k;
+}
+
+/* --- lecture --- */
+async function pullRemote(){
+  const [rc, rj, rp] = await Promise.all([
+    sb.from("poste_code").select("*"),
+    sb.from("poste_jour").select("jour, code"),
+    sb.from("reglage").select("cle, valeur")
+  ]);
+  for(const r of [rc, rj, rp]) if(r.error) throw r.error;
+
   applying = true;
-  ref   = s.codes || {};
-  jours = s.jours || {};
+  ref = {};   rc.data.forEach(r => ref[r.code] = codeDeLigne(r));
+  jours = {}; rj.data.forEach(r => jours[cleOf(r.jour)] = r.code || "");
+  prefs = Object.assign({lead:45, calName:"Travail"},
+            Object.fromEntries(rp.data.map(r => [r.cle, r.valeur])));
+
   migrate();
-  pruneJours(jours);
-  prefs = Object.assign({lead:45, calName:"Travail"}, s.prefs || {});
-  saveRef(); saveJours(); savePrefs();
+  /* Photo de ce que contient la base, pour calculer les écarts au prochain envoi.
+     Prise AVANT la purge : les jours de plus de 90 jours apparaissent ainsi comme
+     retirés, et l'envoi suivant les efface aussi de la base — sinon ils s'y
+     accumuleraient sans fin. */
+  srvRef   = JSON.parse(JSON.stringify(ref));
+  srvJours = Object.assign({}, jours);
+  srvPrefs = Object.assign({}, prefs);
+  const purge = pruneJours(jours);
+
+  store.set("cycle:codes", wrap(ref));
+  store.set("cycle:jours", wrap(jours));
+  store.set("cycle:prefs", wrap(prefs));
   applying = false;
-  meta.majLe = s.majLe || Date.now();
-  saveMeta();
+  if(purge) scheduleSync();   /* après applying : sinon l'envoi serait ignoré */
+
   $("lead").value = prefs.lead;
   $("calName").value = prefs.calName;
   renderAll();
 }
 
+/* --- écriture : uniquement les écarts --- */
+async function pushRemote(){
+  const meme = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+
+  const codesAjout = Object.keys(ref).filter(c => !meme(ref[c], srvRef[c])).map(c => ligneCode(c, ref[c]));
+  const codesRetir = Object.keys(srvRef).filter(c => !(c in ref));
+  const joursAjout = Object.keys(jours).filter(k => jours[k] !== srvJours[k])
+                       .map(k => ({jour:dateOf(k), code: jours[k] || null}));
+  const joursRetir = Object.keys(srvJours).filter(k => !(k in jours)).map(dateOf);
+  const reglAjout  = ["lead","calName"].filter(c => !meme(prefs[c], srvPrefs[c]))
+                       .map(c => ({cle:c, valeur:prefs[c]}));
+
+  if(!codesAjout.length && !codesRetir.length && !joursAjout.length
+     && !joursRetir.length && !reglAjout.length) return false;
+
+  /* ordre imposé par la clé étrangère : un jour ne peut pointer que vers un code
+     qui existe déjà, et un code ne se supprime qu'une fois ses jours réglés. */
+  const etapes = [
+    codesAjout.length && sb.from("poste_code").upsert(codesAjout),
+    joursRetir.length && sb.from("poste_jour").delete().in("jour", joursRetir),
+    joursAjout.length && sb.from("poste_jour").upsert(joursAjout),
+    codesRetir.length && sb.from("poste_code").delete().in("code", codesRetir),
+    reglAjout.length  && sb.from("reglage").upsert(reglAjout)
+  ].filter(Boolean);
+  for(const e of etapes){ const {error} = await e; if(error) throw error; }
+
+  srvRef   = JSON.parse(JSON.stringify(ref));
+  srvJours = Object.assign({}, jours);
+  srvPrefs = Object.assign({}, prefs);
+  return true;
+}
+
 function scheduleSync(){
-  if(!SYNC_REPO || applying) return;
+  if(!session || applying) return;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(()=>{ syncTimer = null; syncNow(true); }, 2500);
+  syncTimer = setTimeout(()=>{ syncTimer = null; syncNow(); }, 1500);
 }
 
-async function ghFetch(method, body){
-  const headers = {"Accept":"application/vnd.github+json"};
-  if(ghToken) headers["Authorization"] = "Bearer " + ghToken;
-  const r = await fetch(apiUrl() + (method==="GET" ? "?ref=" + SYNC_BRANCH + "&t=" + Date.now() : ""), {
-    method, headers, cache:"no-store",
-    body: body ? JSON.stringify(body) : undefined
-  });
-  return r;
-}
-
-async function pushState(){
-  const body = {
-    message: "maj planning " + new Date().toLocaleDateString("fr-FR"),
-    content: b64e(syncPayload()),
-    branch: SYNC_BRANCH
-  };
-  if(syncSha) body.sha = syncSha;
-  const r = await ghFetch("PUT", body);
-  if(!r.ok) throw new Error("HTTP " + r.status);
-  const j = await r.json();
-  syncSha = j.content && j.content.sha;
-  setSyncStatus("Publié pour les autres appareils à " + hhmm() + ".");
-}
-
-async function syncNow(force){
-  if(!SYNC_REPO || syncBusy) return;
-  if(!force && Date.now() - lastPull < 60000) return;   /* limite d'API : pas plus d'une lecture/min */
+async function syncNow(lireAussi){
+  if(!session || syncBusy) return;
   syncBusy = true;
   try{
-    const r = await ghFetch("GET");
-    lastPull = Date.now();
-    let remote = null;
-    if(r.status === 404){
-      remote = null;                                    /* pas encore de data.json dans le dépôt */
-    }else if(r.ok){
-      const j = await r.json();
-      syncSha = j.sha;
-      try{ remote = JSON.parse(b64d(j.content)); }catch(e){ remote = null; }
-    }else{
-      throw new Error("HTTP " + r.status);
-    }
-
-    const remoteMaj = remote ? (remote.majLe || 0) : 0;
-    if(remoteMaj > meta.majLe){
-      applyRemote(remote);
-      setSyncStatus("À jour — planning reçu à " + hhmm() + ".");
-    }else if(meta.majLe > remoteMaj){
-      if(ghToken){
-        try{ await pushState(); }
-        catch(e){
-          if(String(e.message).match(/409|422/)){       /* écrit entre-temps : on relit puis on retente */
-            const r2 = await ghFetch("GET");
-            if(r2.ok){ const j2 = await r2.json(); syncSha = j2.sha;
-              const rem2 = JSON.parse(b64d(j2.content));
-              if((rem2.majLe||0) > meta.majLe){ applyRemote(rem2); setSyncStatus("À jour — planning reçu à " + hhmm() + "."); }
-              else await pushState();
-            }
-          }else if(String(e.message).includes("401") || String(e.message).includes("403"))
-            setSyncStatus("Jeton refusé par GitHub — vérifie le jeton et ses droits (Contents, lecture-écriture).", true);
-          else throw e;
-        }
-      }else{
-        setSyncStatus("Modifications locales non publiées — ce n'est pas l'appareil éditeur (pas de jeton).", true);
-      }
-    }else{
-      /* rien de nouveau de part et d'autre : l'éditeur en profite pour purger
-         du data.json les jours trop anciens qui y traîneraient encore */
-      if(ghToken && remote && remote.jours && Object.keys(remote.jours).some(k=> k < pruneCutoff()))
-        await pushState();
-      else
-        setSyncStatus("À jour (" + hhmm() + ").");
-    }
+    if(lireAussi) await pullRemote();
+    const envoye = await pushRemote();
+    setSyncStatus(envoye ? "Enregistré pour tout le monde à " + hhmm() + "." : "À jour (" + hhmm() + ").");
   }catch(e){
-    if(!navigator.onLine) setSyncStatus("Hors ligne — la synchro reprendra au retour du réseau.", true);
-    else setSyncStatus("Synchro impossible (" + e.message + ") — nouvel essai plus tard.", true);
+    if(!navigator.onLine)
+      setSyncStatus("Hors ligne — tes modifications sont gardées ici et partiront au retour du réseau.", true);
+    else if(e && (e.code === "42501" || String(e.message||"").includes("row-level security")))
+      setSyncStatus("Ton compte n'a pas le droit de modifier le planning (rôle « enfant »).", true);
+    else
+      setSyncStatus("Enregistrement impossible (" + (e.message||e) + ") — nouvel essai plus tard.", true);
   }
   syncBusy = false;
 }
 
-function renderSyncUI(){
-  if(!SYNC_REPO){
-    $("syncInfo").textContent = "Non configurée : renseigne la constante SYNC_REPO en tête du fichier index.html avant la mise en ligne (voir README). En attendant, tout reste sur cet appareil.";
-    $("syncCfg").hidden = true;
-    return;
-  }
-  $("syncInfo").innerHTML = `Le planning est lu automatiquement depuis le fichier <strong>${esc(SYNC_PATH)}</strong>
-    du dépôt <strong>${esc(SYNC_REPO)}</strong> — rien à configurer pour consulter.
-    Seul l'appareil où tu importes le planning a besoin du jeton (voir README pour le créer).`;
-  $("syncCfg").hidden = false;
-  $("ghToken").value = ghToken;
+/* --- temps réel : la modification d'un autre appareil arrive toute seule --- */
+function ecouterTempsReel(){
+  if(canalTemsReel) return;
+  canalTemsReel = sb.channel("planning")
+    .on("postgres_changes", {event:"*", schema:"public"}, ()=>{
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(()=>{ syncTimer = null; syncNow(true); }, 800);
+    })
+    .subscribe();
 }
 
-$("tokenSave").addEventListener("click", ()=>{
-  ghToken = $("ghToken").value.trim();
-  saveToken();
-  setSyncStatus(ghToken ? "Jeton enregistré sur cet appareil." : "Jeton effacé — cet appareil ne publie plus.");
-  if(ghToken) syncNow(true);
-});
+/* ---------- connexion ---------- */
+async function chargerProfil(){
+  const {data} = await sb.from("profil").select("prenom, role").eq("id", session.user.id).single();
+  moi = data;
+}
+
+async function connexionEnvoyer(){
+  const mail = $("authMail").value.trim();
+  if(!mail) return;
+  $("authBtn").disabled = true;
+  const {error} = await sb.auth.signInWithOtp({
+    email: mail,
+    options:{emailRedirectTo: location.href.split("#")[0]}
+  });
+  $("authBtn").disabled = false;
+  $("authMsg").innerHTML = error
+    ? `<p class="msg warn">${esc(error.message)}</p>`
+    : `<p class="msg ok">Lien envoyé à ${esc(mail)}. Ouvre-le depuis cet appareil — il te ramènera ici, connecté.</p>`;
+}
+
+function renderSyncUI(){
+  $("syncInfo").innerHTML = moi
+    ? `Connectée en tant que <strong>${esc(moi.prenom)}</strong>${moi.role==="enfant" ? " (lecture seule)" : ""}.
+       Le planning est partagé avec les autres comptes du foyer et se met à jour tout seul.`
+    : "Non connectée.";
+  $("syncCfg").hidden = !session;
+}
+
 $("syncNowBtn").addEventListener("click", ()=> syncNow(true));
+$("deconnexion").addEventListener("click", async ()=>{
+  if(!confirm("Se déconnecter de cet appareil ?")) return;
+  await sb.auth.signOut();
+  location.reload();
+});
 
 /* ---------- rendu global & navigation ---------- */
 function renderAll(){
@@ -1266,18 +1345,17 @@ $("calName").addEventListener("change", ()=>{
 });
 
 /* ---------- chargement + migrations ---------- */
+$("authBtn").addEventListener("click", connexionEnvoyer);
+$("authMail").addEventListener("keydown", e=>{ if(e.key==="Enter") connexionEnvoyer(); });
+
 (async ()=>{
   const rawC = await store.get("cycle:codes");
   const rawJ = await store.get("cycle:jours");
   const rawF = await store.get("cycle:prefs");
-  const rawM = await store.get("cycle:meta");
-  const rawK = await store.get("cycle:token");
 
   if(rawC) ref = unwrap(rawC) || {};
   if(rawJ) jours = unwrap(rawJ) || {};
   if(rawF) prefs = Object.assign({lead:45, calName:"Travail"}, unwrap(rawF));
-  if(rawM) meta = Object.assign({majLe:0}, unwrap(rawM));
-  if(rawK) ghToken = unwrap(rawK) || "";
 
   /* Migration v2 → v3 : les cycles empilés deviennent un seul planning,
      le plus récent collage gagne sur les dates communes. Uniquement si
@@ -1328,13 +1406,43 @@ $("calName").addEventListener("change", ()=>{
   renderAll();
   showTab("planning");
 
-  renderSyncUI();
-  if(SYNC_REPO){
-    syncNow(true);
-    window.addEventListener("online", ()=> syncNow(true));
-    document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) syncNow(); });
-  }
+  /* Le cache local s'affiche tout de suite ; la base prend le relais dès que la
+     session est connue. Un appareil déjà connecté ne revoit jamais l'écran de
+     connexion, y compris hors réseau. */
+  const {data:{session:s0}} = await sb.auth.getSession();
+  await ouvrirSession(s0);
+
+  sb.auth.onAuthStateChange(async (_ev, s)=>{
+    if(s && !session) await ouvrirSession(s);
+    else if(!s && session){ session = null; moi = null; montrerEcrans(); }
+  });
+
+  window.addEventListener("online", ()=> syncNow(true));
+  document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) syncNow(true); });
 })();
+
+function montrerEcrans(){
+  $("authEcran").hidden    = !!session;
+  $("appEcran").hidden     = !session;
+  $("barreOnglets").hidden = !session;
+}
+
+async function ouvrirSession(s){
+  session = s || null;
+  montrerEcrans();
+  if(!session) return;
+  /* l'adresse garde le jeton du lien de connexion : on la nettoie */
+  if(location.hash.includes("access_token"))
+    history.replaceState(null, "", location.pathname + location.search);
+  try{
+    await chargerProfil();
+    renderSyncUI();
+    await syncNow(true);
+    ecouterTempsReel();
+  }catch(e){
+    setSyncStatus("Connexion à la base impossible — l'appli fonctionne avec la copie de cet appareil.", true);
+  }
+}
 </script>
 </body>
 </html>
