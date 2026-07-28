@@ -7,6 +7,28 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A1%3C/text%3E%3C/svg%3E">
 <title>Chez F&amp;A</title>
 <link rel="stylesheet" href="css/app.css">
+
+<!-- Filet de sécurité, à enregistrer avant tout le reste : les deux écrans
+     partent masqués, donc un script qui échoue au démarrage (bibliothèque
+     bloquée, module en erreur) laissait une page blanche muette — impossible à
+     dépanner à distance. On affiche au moins la panne. -->
+<script>
+window.addEventListener("error", function(ev){
+  var app = document.getElementById("appEcran"), auth = document.getElementById("authEcran");
+  if(!auth || !auth.hidden) return;      /* écran de connexion déjà affiché */
+  if(app && !app.hidden) return;         /* l'appli tourne : ce n'est pas un échec de démarrage */
+  var src = ev.target && ev.target.src;
+  auth.hidden = false;
+  var zone = document.getElementById("authMsg");
+  if(!zone) return;
+  var p = document.createElement("p");
+  p.className = "msg warn";
+  p.textContent = "L'appli n'a pas réussi à démarrer sur cet appareil. "
+    + (src ? "Ce fichier n'a pas pu être chargé : " + src : String(ev.message || ""));
+  zone.innerHTML = "";
+  zone.appendChild(p);
+}, true);   /* en capture : l'échec de chargement d'un script ne remonte pas jusqu'ici sans ça */
+</script>
 </head>
 <body>
 
@@ -14,17 +36,25 @@
 <div id="authEcran" hidden>
   <div class="wrap" style="max-width:420px;padding-top:56px">
     <h1>Chez F&amp;A</h1>
-    <p class="sub">Connexion par lien reçu par mail — une seule fois par appareil.</p>
+    <p class="sub">Une fois connecté, l'appareil le reste.</p>
     <div class="step">
-      <label for="authMail">Ton adresse mail</label>
-      <input type="email" id="authMail" autocomplete="email" inputmode="email"
-             placeholder="prenom@exemple.fr">
-      <div class="row">
-        <button id="authBtn">Recevoir le lien</button>
-      </div>
+      <!-- Un vrai formulaire : le navigateur propose alors d'enregistrer le mot
+           de passe, et le remet tout seul aux fois suivantes. -->
+      <form id="authForm">
+        <label for="authMail">Ton adresse mail</label>
+        <input type="email" id="authMail" name="email" autocomplete="email" inputmode="email"
+               placeholder="prenom@exemple.fr">
+        <label for="authMdp" style="margin-top:12px">Ton mot de passe</label>
+        <input type="password" id="authMdp" name="password" autocomplete="current-password">
+        <div class="row">
+          <button type="submit" id="authBtn">Se connecter</button>
+          <button type="button" class="ghost" id="authLienBtn">Recevoir un lien</button>
+        </div>
+      </form>
       <div id="authMsg"></div>
-      <p class="hint">Pas de mot de passe à retenir. Le lien ouvre l'appli déjà connectée,
-        et l'appareil reste connecté ensuite.</p>
+      <p class="hint">Pas encore de mot de passe, ou oublié&nbsp;? Demande un lien&nbsp;:
+        il ouvre l'appli connectée, et tu poses ton mot de passe dans
+        Réglages → Compte. Ouvre le lien sur cet appareil, dans ce navigateur.</p>
     </div>
   </div>
 </div>
@@ -269,6 +299,18 @@
           </div>
         </div>
         <div id="prenomMsg"></div>
+        <label for="monMdp" style="margin-top:14px">Ton mot de passe, pour te connecter
+          sans passer par le mail</label>
+        <div class="row" style="margin-top:0">
+          <div style="flex:3">
+            <input type="password" id="monMdp" autocomplete="new-password"
+                   placeholder="huit caractères au moins">
+          </div>
+          <div style="flex:0 0 auto;display:flex;align-items:flex-end">
+            <button class="ghost" id="mdpSave">Enregistrer</button>
+          </div>
+        </div>
+        <div id="mdpMsg"></div>
         <div class="row">
           <button id="syncNowBtn">Synchroniser maintenant</button>
           <button class="ghost danger" id="deconnexion">Se déconnecter</button>

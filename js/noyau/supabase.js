@@ -65,6 +65,26 @@ export async function changerPrenom(nouveau){
   return {error};
 }
 
+/* Le mot de passe est le chemin normal, le lien reçu par mail n'est qu'un
+   secours. La raison n'est pas le confort : un mot de passe se tape DANS
+   l'appli, donc la session s'enregistre dans le stockage de l'appli. Le lien,
+   lui, s'ouvre souvent ailleurs — le navigateur du logiciel de courrier, ou
+   Safari alors que l'appli tourne depuis un raccourci de l'écran d'accueil, qui
+   a son propre stockage. La connexion réussit, la session atterrit à côté, et
+   l'appli reste déconnectée sans rien pouvoir en dire. */
+export const connecter = (mail, mdp) =>
+  sb.auth.signInWithPassword({email: String(mail).trim(), password: String(mdp)});
+
+/* Personne ne connaît son mot de passe au départ : chacun pose le sien depuis
+   Réglages → Compte, une fois entré par le lien. Même raison que pour le prénom
+   — le faire à la main en base serait à refaire au compte suivant. */
+export async function changerMotDePasse(nouveau){
+  const mdp = String(nouveau);
+  if(!session) return {error:{message:"Aucune session ouverte."}};
+  if(mdp.length < 8) return {error:{message:"Huit caractères au moins."}};
+  return sb.auth.updateUser({password: mdp});
+}
+
 export function fermer(){ session = null; moi = null; foyer = {}; }
 
 export function surChangementDeSession(fn){

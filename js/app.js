@@ -134,15 +134,53 @@ async function ouvrirSession(s){
   }
 }
 
+/* Les messages de Supabase arrivent en anglais. Les deux qu'on voit vraiment
+   méritent d'être dits en français ; le reste passe tel quel plutôt que d'être
+   avalé. */
+function enClair(m){
+  const t = String(m || "");
+  if(/invalid login credentials/i.test(t)) return "Adresse ou mot de passe incorrect.";
+  if(/email not confirmed/i.test(t))       return "Cette adresse n'est pas encore confirmée.";
+  if(/password should be at least/i.test(t)) return "Mot de passe trop court.";
+  return t;
+}
+
+const direAuth = (txt, ok) =>
+  $("authMsg").innerHTML = `<p class="msg ${ok ? "ok" : "warn"}">${esc(txt)}</p>`;
+
+async function connexionMotDePasse(){
+  const mail = $("authMail").value.trim(), mdp = $("authMdp").value;
+  if(!mail || !mdp) return direAuth("Il faut l'adresse mail et le mot de passe.");
+  $("authBtn").disabled = true;
+  $("authMsg").innerHTML = "";
+  const {error} = await Auth.connecter(mail, mdp);
+  $("authBtn").disabled = false;
+  if(error) return direAuth(enClair(error.message));
+  /* pas d'appel à ouvrirSession ici : le changement de session s'en charge */
+  $("authMdp").value = "";
+}
+
 async function connexionEnvoyer(){
   const mail = $("authMail").value.trim();
-  if(!mail) return;
-  $("authBtn").disabled = true;
+  if(!mail) return direAuth("Ton adresse mail d'abord.");
+  $("authLienBtn").disabled = true;
   const {error} = await Auth.envoyerLien(mail);
-  $("authBtn").disabled = false;
-  $("authMsg").innerHTML = error
-    ? `<p class="msg warn">${esc(error.message)}</p>`
-    : `<p class="msg ok">Lien envoyé à ${esc(mail)}. Ouvre-le depuis cet appareil — il te ramènera ici, connecté.</p>`;
+  $("authLienBtn").disabled = false;
+  if(error) return direAuth(enClair(error.message));
+  direAuth(`Lien envoyé à ${mail}. Ouvre-le sur cet appareil, dans ce navigateur — `
+    + "il ne sert qu'une fois. Pose ensuite ton mot de passe dans Réglages → Compte.", true);
+}
+
+/* Un lien déjà utilisé ou périmé revient avec son erreur dans l'adresse. Sans
+   ce message, on retombe sur l'écran de connexion sans savoir pourquoi — et on
+   reclique le même lien, qui échoue encore. Lu tout de suite au démarrage :
+   la bibliothèque Supabase nettoie l'adresse de son côté. */
+function erreurDansAdresse(){
+  if(!location.hash.includes("error")) return null;
+  const h = new URLSearchParams(location.hash.slice(1));
+  const err = h.get("error_description") || h.get("error");
+  if(err) history.replaceState(null, "", location.pathname + location.search);
+  return err;
 }
 
 /* ---------- câblage ---------- */
@@ -155,8 +193,8 @@ brancherAgenda();
 R.brancherRappels();
 brancherIdees();
 
-$("authBtn").addEventListener("click", connexionEnvoyer);
-$("authMail").addEventListener("keydown", e => { if(e.key === "Enter") connexionEnvoyer(); });
+$("authForm").addEventListener("submit", e => { e.preventDefault(); connexionMotDePasse(); });
+$("authLienBtn").addEventListener("click", connexionEnvoyer);
 $("syncNowBtn").addEventListener("click", () => sync.maintenant(true));
 $("prenomSave").addEventListener("click", async () => {
   const {error} = await Auth.changerPrenom($("monPrenom").value);
@@ -171,6 +209,17 @@ $("prenomSave").addEventListener("click", async () => {
 });
 $("monPrenom").addEventListener("keydown", e => {
   if(e.key === "Enter"){ e.preventDefault(); $("prenomSave").click(); }
+});
+$("mdpSave").addEventListener("click", async () => {
+  const {error} = await Auth.changerMotDePasse($("monMdp").value);
+  $("mdpMsg").innerHTML = error
+    ? `<p class="msg warn">${esc(enClair(error.message))}</p>`
+    : `<p class="msg ok">Mot de passe enregistré. C'est celui-là, avec ton adresse mail,
+       sur chaque appareil.</p>`;
+  if(!error) $("monMdp").value = "";
+});
+$("monMdp").addEventListener("keydown", e => {
+  if(e.key === "Enter"){ e.preventDefault(); $("mdpSave").click(); }
 });
 $("deconnexion").addEventListener("click", async () => {
   if(!confirm("Se déconnecter de cet appareil ?")) return;
@@ -188,6 +237,8 @@ $("calName").addEventListener("change", () => {
 
 /* ---------- démarrage ---------- */
 (async () => {
+  const erreurLien = erreurDansAdresse();   /* avant tout await : l'adresse se nettoie vite */
+
   /* Le cache local s'affiche tout de suite ; la base prend le relais dès que la
      session est connue. Un appareil déjà connecté ne revoit jamais l'écran de
      connexion, y compris hors réseau. */
@@ -221,6 +272,10 @@ $("calName").addEventListener("change", () => {
   showTab("agenda");   /* c'est ce qu'on regarde le plus souvent en ouvrant l'appli */
 
   await ouvrirSession(await Auth.sessionCourante());
+
+  if(erreurLien && !Auth.getSession())
+    direAuth("Ce lien n'est plus valable — un lien ne sert qu'une fois, et il expire. "
+      + "Connecte-toi avec ton mot de passe, ou demande un nouveau lien.");
 
   Auth.surChangementDeSession(async s => {
     if(s && !Auth.getSession()) await ouvrirSession(s);

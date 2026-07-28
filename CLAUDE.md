@@ -79,8 +79,21 @@ ce serait à refaire au compte suivant.
 tous les comptes.** Ajouter du pain n'engage rien, réécrire le planning si.
 
 Après toute migration, lancer `get_advisors` (type `security`) et corriger ce
-qui remonte. Seul avertissement acceptable en l'état : *leaked password
-protection*, sans objet puisque la connexion se fait par lien envoyé par mail.
+qui remonte. Plus d'avertissement à laisser passer : *leaked password
+protection* était sans objet du temps de la connexion par lien seul, elle ne
+l'est plus depuis que le mot de passe est le chemin normal — à activer dans
+Authentication → Policies.
+
+**La connexion se fait par mot de passe ; le lien reçu par mail n'est qu'un
+secours.** Ce n'est pas une question de confort. Un mot de passe se tape dans
+l'appli, donc la session s'enregistre dans le stockage de l'appli. Un lien
+s'ouvre là où le mail est lu — le navigateur intégré du logiciel de courrier,
+ou Safari alors que l'appli tourne depuis un raccourci de l'écran d'accueil, qui
+a son propre stockage. La connexion réussit, la session atterrit à côté, et
+l'appareil reste déconnecté sans pouvoir le dire. C'est ce qui a cassé l'appli
+de Fab le 27/07/2026. Le lien reste pour le premier accès et les mots de passe
+oubliés : chacun pose ensuite le sien dans Réglages → Compte. **Ne pas fixer de
+mot de passe en SQL ni depuis le tableau de bord** — même raison que le prénom.
 
 La clé `sb_publishable_…` dans `js/noyau/supabase.js` est **publique par
 conception**. Ne jamais mettre la clé `service_role` dans le code du navigateur.
@@ -114,6 +127,14 @@ vingtaine de combinaisons dont presque aucune ne sert. Et l'information filtrée
 invalide — on ne colle pas une transparence hexadécimale derrière une variable ;
 il faut une propriété `opacity` à part. Ce bug a survécu à un test qui se
 contentait de lire l'attribut `style` : mesurer avec `getComputedStyle`.
+
+**Jamais de page blanche muette.** Les deux écrans partent `hidden`, donc une
+exception au démarrage ne montrait rien du tout — et l'autre compte n'a alors
+rien à raconter, ce qui rend le dépannage à distance impossible. Un gestionnaire
+`error` en tête d'`index.html` révèle l'écran de connexion et affiche la panne.
+Il est posé **en phase de capture** : un échec de chargement de fichier ne
+remonte pas jusqu'à `window` autrement. Vérifié en provoquant les deux pannes,
+pas en relisant le code.
 
 **Heures locales, jamais UTC** — sinon les postes se décalent d'une heure deux
 fois par an.
