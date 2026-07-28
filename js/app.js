@@ -113,8 +113,7 @@ function montrerEcrans(){
 function renderSyncUI(){
   const moi = Auth.getMoi();
   $("syncInfo").innerHTML = moi
-    ? `Connectée en tant que <strong>${esc(moi.prenom)}</strong>${moi.role === "enfant" ? " (lecture seule)" : ""}.
-       Tout est partagé avec l’autre compte et se met à jour tout seul.`
+    ? `Connectée en tant que <strong>${esc(moi.prenom)}</strong>${moi.role === "enfant" ? " (lecture seule)" : ""}.`
     : "Non connectée.";
   $("syncCfg").hidden = !Auth.getSession();
   if(moi) $("monPrenom").value = moi.prenom;

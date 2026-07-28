@@ -79,10 +79,15 @@ ce serait à refaire au compte suivant.
 tous les comptes.** Ajouter du pain n'engage rien, réécrire le planning si.
 
 Après toute migration, lancer `get_advisors` (type `security`) et corriger ce
-qui remonte. Plus d'avertissement à laisser passer : *leaked password
-protection* était sans objet du temps de la connexion par lien seul, elle ne
-l'est plus depuis que le mot de passe est le chemin normal — à activer dans
-Authentication → Policies.
+qui remonte. Un seul avertissement reste, et il n'est pas corrigeable :
+*leaked password protection*, que Supabase réserve au forfait Pro — au forfait
+gratuit, la case n'existe pas dans le tableau de bord. Elle était sans objet du
+temps de la connexion par lien seul ; depuis que le mot de passe est le chemin
+normal, ce qui en tient lieu est la longueur minimale de 8 caractères
+(Authentication → Sign In / Providers → Email, et le même seuil côté navigateur
+dans `changerMotDePasse`) plus le gestionnaire de mots de passe du téléphone.
+À deux comptes qui ne s'inscrivent nulle part ailleurs, le risque de mot de
+passe déjà fuité est faible — ne pas passer au forfait Pro pour ça.
 
 **La connexion se fait par mot de passe ; le lien reçu par mail n'est qu'un
 secours.** Ce n'est pas une question de confort. Un mot de passe se tape dans
