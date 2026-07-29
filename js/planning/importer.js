@@ -43,8 +43,10 @@ export function renderImporter(){
     h += `<p class="msg warn">Aucun code détecté dans ce collage.</p>`;
   }else if(startV){
     const d0 = dateFrom(startV), d1 = addDays(startV, codes.length-1);
+    /* Pas de « (= début + N jours) » : le compte et les deux dates disent déjà
+       tout, ce rappel du calcul ne faisait qu'allonger la ligne. */
     h += `<p class="msg"><strong>${codes.length} jours</strong> depuis le ${fmtLong(d0)}
-      → fin le <strong>${fmtLongY(d1)}</strong> (= début + ${codes.length-1} jours).</p>`;
+      → fin le <strong>${fmtLongY(d1)}</strong>.</p>`;
     if(codes.length % 7 === 0)
       h += `<p class="msg ok">Soit ${codes.length/7} semaine${codes.length>7?"s":""} complète${codes.length>7?"s":""}.</p>`;
     else

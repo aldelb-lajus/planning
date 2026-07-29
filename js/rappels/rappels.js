@@ -33,15 +33,19 @@ export const CATEGORIES = {
   autre: {lbl:"Autre",         emoji:"✨"}
 };
 
-/* Raccourcis proposés ; « Personnalisée » ouvre la saisie libre juste à côté. */
+/* Raccourcis proposés ; « Personnalisée » ouvre la saisie libre juste à côté et
+   doit rester EN DERNIER — `indexPeriode` y retombe pour toute périodicité qui
+   ne figure pas dans cette liste. */
 export const PERIODES = [
-  {v:null, u:null,   lbl:"Aucune date"},
-  {v:0,    u:"une",  lbl:"Une seule fois"},
-  {v:1,    u:"mois", lbl:"Tous les mois"},
-  {v:3,    u:"mois", lbl:"Tous les 3 mois"},
-  {v:6,    u:"mois", lbl:"Tous les 6 mois"},
-  {v:12,   u:"mois", lbl:"Tous les ans"},
-  {v:-1,   u:"perso",lbl:"Personnalisée…"}
+  {v:null, u:null,      lbl:"Aucune date"},
+  {v:0,    u:"une",     lbl:"Une seule fois"},
+  {v:1,    u:"semaine", lbl:"Toutes les semaines"},
+  {v:2,    u:"semaine", lbl:"Toutes les 2 semaines"},
+  {v:1,    u:"mois",    lbl:"Tous les mois"},
+  {v:3,    u:"mois",    lbl:"Tous les 3 mois"},
+  {v:6,    u:"mois",    lbl:"Tous les 6 mois"},
+  {v:12,   u:"mois",    lbl:"Tous les ans"},
+  {v:-1,   u:"perso",   lbl:"Personnalisée…"}
 ];
 
 const save = () => {
@@ -119,13 +123,17 @@ export const parUrgence = () => Object.entries(rappels).sort((a, b) => {
 export const enRetard = () =>
   parUrgence().filter(([, r]) => r.prochaineLe && joursAvant(r.prochaineLe) < 0).length;
 
+/* « toutes les semaines », mais « tous les mois » : le genre suit l'unité, et
+   au singulier on ne dit pas « tous les 1 jour ». L'ancienne version ne traitait
+   ce cas que pour les mois — un rappel quotidien s'annonçait « tous les 1 jour ». */
 export function libellePeriode(r){
   if(!r.periodeValeur) return r.prochaineLe ? "une seule fois" : "sans date";
-  const u = r.periodeUnite === "mois"
-    ? (r.periodeValeur > 1 ? "mois" : "mois")
-    : (r.periodeValeur > 1 ? "jours" : "jour");
-  return r.periodeValeur === 1 && r.periodeUnite === "mois" ? "tous les mois"
-       : `tous les ${r.periodeValeur} ${u}`;
+  const n = r.periodeValeur;
+  if(r.periodeUnite === "semaine")
+    return n === 1 ? "toutes les semaines" : `toutes les ${n} semaines`;
+  if(r.periodeUnite === "mois")
+    return n === 1 ? "tous les mois" : `tous les ${n} mois`;
+  return n === 1 ? "tous les jours" : `tous les ${n} jours`;
 }
 
 /* ---------- écriture ---------- */
@@ -156,6 +164,11 @@ export function prochaineApres(dateIso, valeur, unite){
     d.setMonth(d.getMonth() + valeur);
     /* 31 janvier + 1 mois : février n'a pas de 31, on retombe sur son dernier jour */
     if(d.getDate() !== jour) d.setDate(0);
+  }else if(unite === "semaine"){
+    /* Une semaine tombe toujours le même jour de la semaine — c'est tout
+       l'intérêt : « le samedi » reste le samedi, là où « tous les 7 jours »
+       dérivait dès qu'on cochait avec un jour de retard. */
+    d.setDate(d.getDate() + valeur * 7);
   }else{
     d.setDate(d.getDate() + valeur);
   }
@@ -249,6 +262,7 @@ export function ouvrirEditeurRappel(id){
       <div><label for="rmPersoUnite">Unité</label>
         <select id="rmPersoUnite">
           <option value="mois"${!perso || r.periodeUnite === "mois" ? " selected" : ""}>mois</option>
+          <option value="semaine"${perso && r.periodeUnite === "semaine" ? " selected" : ""}>semaines</option>
           <option value="jour"${perso && r.periodeUnite === "jour" ? " selected" : ""}>jours</option>
         </select></div>
     </div>
@@ -403,10 +417,21 @@ export function renderRappels(){
     {cle:"tard",     titre:"Plus tard"},
     {cle:"sansdate", titre:"Sans date"}
   ];
+  /* « Cette semaine » est la semaine du calendrier — jusqu'à dimanche soir — et
+     non les sept prochains jours. La différence compte : un mercredi, sept jours
+     glissants rangeaient le mardi suivant dans « cette semaine », alors qu'il
+     appartient à la semaine d'après. Conséquence assumée : le dimanche, le
+     groupe ne contient plus que la journée en cours. */
+  const dimanche = (() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + (6 - (d.getDay() + 6) % 7));   /* lundi = 0 … dimanche = 6 */
+    return isoInput(d);
+  })();
+
   const groupeDe = r => {
     if(!r.prochaineLe) return "sansdate";
-    const j = joursAvant(r.prochaineLe);
-    return j < 0 ? "retard" : j <= 7 ? "semaine" : "tard";
+    if(joursAvant(r.prochaineLe) < 0) return "retard";
+    return r.prochaineLe <= dimanche ? "semaine" : "tard";
   };
 
   const ligneRappel = (id, r, urgent) => {
