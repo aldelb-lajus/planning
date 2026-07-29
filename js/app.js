@@ -3,7 +3,7 @@
    C'est le seul fichier qui connaisse tout le monde. Les modules, eux, ne se
    connaissent pas entre eux — ils passent par le bus de signaux. */
 
-import {$, esc, showTab, brancherOnglets, demanderConfirmation} from "./noyau/ui.js";
+import {$, esc, showTab, brancherOnglets, brancherMenu, demanderConfirmation} from "./noyau/ui.js";
 import {brancherTheme} from "./noyau/theme.js";
 import {store, deballer} from "./noyau/store.js";
 import {sur, emettre} from "./noyau/signal.js";
@@ -188,6 +188,7 @@ function erreurDansAdresse(){
 /* ---------- câblage ---------- */
 brancherTheme();
 brancherOnglets();
+brancherMenu($("reglagesMenu"));
 brancherImporter();
 brancherPlanning();
 brancherExport();

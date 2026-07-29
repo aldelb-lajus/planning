@@ -50,6 +50,21 @@ export function brancherOnglets(){
   });
 }
 
+/* Menu à volets : ouvrir l'un referme les autres.
+
+   Écrit en JS plutôt qu'avec l'attribut `name` des <details>, qui fait la même
+   chose nativement : cet attribut demande Safari 17.4, et l'appli tourne sur
+   des iPhone qu'on ne met pas à jour pour ça. Quatre lignes valent mieux qu'un
+   accordéon qui ne se referme pas chez l'un des deux comptes. */
+export function brancherMenu(conteneur){
+  if(!conteneur) return;
+  const volets = [...conteneur.querySelectorAll("details")];
+  volets.forEach(d => d.addEventListener("toggle", () => {
+    if(!d.open) return;                       /* une fermeture ne referme rien d'autre */
+    volets.forEach(autre => { if(autre !== d) autre.open = false; });
+  }));
+}
+
 /* Feuille modale (choix d'un poste, plus tard choix d'un produit…).
    `contenu` est le HTML intérieur ; `apres` reçoit la feuille pour y brancher
    les événements. Rien n'est écrit tant que l'appelant ne le fait pas. */

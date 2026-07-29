@@ -194,10 +194,18 @@ h1{font-family:var(--titre);font-weight:400;font-size:34px;line-height:1.08;
      d'explication qui ouvraient chaque onglet. — */
 .ecran-tete{display:flex;align-items:flex-end;justify-content:space-between;
   gap:12px;margin:0 0 16px}
+/* Hauteur fixe, et interligne en pixels plutôt qu'en ratio : la ligne est
+   souvent vide (Courses sans article, Réglages hors connexion). Avec une
+   `min-height` qui ne tombait pas juste sur l'interligne, le titre montait
+   d'un pixel sur les écrans sans contexte — assez pour le voir sautiller en
+   passant d'un onglet à l'autre. */
 .ecran-tete .kicker{font-size:10.5px;font-weight:700;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--ink-soft);margin:0;min-height:11px;line-height:1.1}
+  text-transform:uppercase;color:var(--ink-soft);margin:0;height:12px;line-height:12px}
+/* 10 px sous la ligne de contexte, pas 4 : à 30 px de corps, un titre a besoin
+   d'air au-dessus de lui, sinon les petites capitales se lisent comme une
+   première ligne du titre plutôt que comme une mention à part. */
 .ecran-tete h2{font-family:var(--titre);font-weight:400;font-size:30px;
-  line-height:1.1;letter-spacing:-.02em;margin:4px 0 0;text-transform:none;
+  line-height:1.1;letter-spacing:-.02em;margin:10px 0 0;text-transform:none;
   color:var(--ink)}
 .ecran-tete .actions{flex:none;display:flex;gap:8px;align-items:center}
 
@@ -685,12 +693,44 @@ td input[type=text]{min-width:110px}
 .theme-choix button[aria-pressed="true"]{background:var(--card);color:var(--ink);
   box-shadow:var(--ombre-sm)}
 
-/* Fiche du compte : des lignes dans un même cadre, pas trois cartes empilées. */
+/* Fiche : des lignes dans un même cadre, pas plusieurs cartes empilées. */
 .fiche{border-radius:var(--r-lg);background:var(--card);border:1px solid var(--rule);
   overflow:hidden;margin-top:0}
 .fiche > *{padding:14px 16px;border-bottom:1px solid var(--rule)}
 .fiche > *:last-child{border-bottom:none}
 .fiche label{margin-bottom:8px}
+
+/* ================= menu des réglages =================
+   Trois sujets qui ne se consultent pas en même temps : un menu où l'ouverture
+   de l'un referme les autres. Empilés, ils faisaient défiler longtemps pour
+   rien — et le mot de passe, tout en bas, était le plus loin de tout.
+
+   Ce n'est PAS un troisième niveau de navigation : on ne change pas d'écran,
+   on déplie. La règle des deux niveaux — barre du bas pour les usages,
+   sous-onglets pour les sections d'un module — reste entière. */
+
+.menu{border-radius:var(--r-lg);background:var(--card);
+  border:1px solid var(--rule);overflow:hidden}
+.reglage + .reglage{border-top:1px solid var(--rule)}
+.reglage > summary{display:flex;align-items:center;gap:10px;width:100%;
+  list-style:none;cursor:pointer;min-height:56px;padding:14px 16px;
+  font-size:15px;font-weight:600;color:var(--ink)}
+.reglage > summary::-webkit-details-marker{display:none}
+.reglage > summary:active{background:var(--voile)}
+/* Chevron couché, qui bascule vers le bas à l'ouverture : la même mécanique
+   que les volets d'aide, pour que l'appli n'ait qu'un seul geste « ça se
+   déplie ». */
+.reglage > summary::after{content:"";flex:none;margin-left:auto;width:15px;height:15px;
+  background:var(--ink-faint);transition:transform .15s ease;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 5 16 12l-6.5 7'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 5 16 12l-6.5 7'/%3E%3C/svg%3E") center/contain no-repeat}
+.reglage[open] > summary::after{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){ .reglage > summary::after{transition:none} }
+.reglage > .corps{padding:0 16px 18px}
+/* Le cadre du menu tient déjà lieu de carte : une fiche à l'intérieur
+   empilerait deux bordures pour rien. */
+.reglage .fiche{border:none;background:transparent;border-radius:0}
+.reglage .fiche > *{padding-left:0;padding-right:0}
 
 /* ================= couleurs de postes =================
    Le fond ET l'encre viennent de la même famille : l'affichage ne pose plus

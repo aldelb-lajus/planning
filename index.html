@@ -382,57 +382,65 @@ window.addEventListener("error", function(ev){
       </div>
     </header>
 
-    <div class="step">
-      <h2>Apparence</h2>
-      <div class="theme-choix" id="themeChoix" role="group" aria-label="Thème de l'appli">
-        <button data-theme="auto" aria-pressed="true">Auto</button>
-        <button data-theme="clair" aria-pressed="false">Clair</button>
-        <button data-theme="sombre" aria-pressed="false">Sombre</button>
-      </div>
-      <p class="hint">«&nbsp;Auto&nbsp;» suit le réglage du téléphone. Le choix reste
-        sur cet appareil&nbsp;: chacun peut avoir le sien.</p>
-    </div>
+    <!-- Un menu, pas trois blocs empilés : chaque sujet s'ouvre à la demande et
+         referme les autres. Ce n'est pas un troisième niveau de navigation —
+         rien ne change d'écran, la règle des deux niveaux tient. -->
+    <div class="menu" id="reglagesMenu">
+      <details class="reglage">
+        <summary>Apparence</summary>
+        <div class="corps">
+          <div class="theme-choix" id="themeChoix" role="group" aria-label="Thème de l'appli">
+            <button data-theme="auto" aria-pressed="true">Auto</button>
+            <button data-theme="clair" aria-pressed="false">Clair</button>
+            <button data-theme="sombre" aria-pressed="false">Sombre</button>
+          </div>
+          <p class="hint">«&nbsp;Auto&nbsp;» suit le réglage du téléphone. Le choix reste
+            sur cet appareil&nbsp;: chacun peut avoir le sien.</p>
+        </div>
+      </details>
 
-    <div class="step">
-      <h2>Idées d'évolution</h2>
-      <textarea id="ideeTexte" rows="2" placeholder="ex. suivi des chats — vaccins, vermifuge…"
-                style="font-family:inherit;font-size:15px;white-space:normal;min-height:68px"></textarea>
-      <div class="btns">
-        <button id="ideeBtn">Ajouter l'idée</button>
-      </div>
-      <div id="ideesListe"></div>
-    </div>
+      <details class="reglage">
+        <summary>Idées d'évolution</summary>
+        <div class="corps">
+          <textarea id="ideeTexte" rows="2" placeholder="ex. suivi des chats — vaccins, vermifuge…"
+                    style="font-family:inherit;font-size:15px;white-space:normal;min-height:68px"></textarea>
+          <div class="btns">
+            <button id="ideeBtn">Ajouter l'idée</button>
+          </div>
+          <div id="ideesListe"></div>
+        </div>
+      </details>
 
-    <div class="step">
-      <h2>Compte et synchronisation</h2>
-      <p class="hint" id="syncStatus" aria-live="polite" style="margin:0 0 12px"></p>
-      <div id="syncCfg" hidden>
-        <div class="fiche">
-          <div>
+      <details class="reglage">
+        <summary>Compte et synchronisation</summary>
+        <div class="corps">
+          <p class="hint" id="syncStatus" aria-live="polite" style="margin:0 0 12px"></p>
+          <div id="syncCfg" hidden>
             <label for="monPrenom">Ton prénom, tel qu'il apparaît dans l'appli</label>
-            <div class="ajout" style="margin:0">
+            <div class="ajout">
               <input type="text" id="monPrenom" autocomplete="given-name" maxlength="24">
               <button class="ghost" id="prenomSave" style="width:auto;padding:0 16px;font-size:13px">OK</button>
             </div>
             <div id="prenomMsg"></div>
-          </div>
-          <div>
-            <label for="monMdp">Ton mot de passe, pour te connecter sans passer par le mail</label>
-            <div class="ajout" style="margin:0">
+
+            <label for="monMdp" style="margin-top:16px">Ton mot de passe, pour te connecter
+              sans passer par le mail</label>
+            <div class="ajout">
               <input type="password" id="monMdp" autocomplete="new-password"
                      placeholder="huit caractères au moins">
               <button class="ghost" id="mdpSave" style="width:auto;padding:0 16px;font-size:13px">OK</button>
             </div>
             <div id="mdpMsg"></div>
+
+            <div class="btns">
+              <button id="syncNowBtn">Synchroniser maintenant</button>
+            </div>
+            <div class="btns">
+              <button class="ghost danger" id="deconnexion">Se déconnecter</button>
+            </div>
           </div>
         </div>
-        <div class="btns">
-          <button id="syncNowBtn">Synchroniser maintenant</button>
-        </div>
-        <div class="btns">
-          <button class="ghost danger" id="deconnexion">Se déconnecter</button>
-        </div>
-      </div>
+      </details>
     </div>
 
   </section>
