@@ -4,7 +4,7 @@
    fichier, parce qu'il est petit. Découper est utile quand ça sert ; ici ça
    n'apporterait que des allers-retours entre fichiers. */
 
-import {$, esc} from "../noyau/ui.js";
+import {$, esc, demanderConfirmation} from "../noyau/ui.js";
 import {emettre} from "../noyau/signal.js";
 import {store, emballer} from "../noyau/store.js";
 import {creerSync} from "../noyau/sync.js";
@@ -69,11 +69,6 @@ export function renderIdees(){
     return (b[1].creeLe || "").localeCompare(a[1].creeLe || "");
   });
 
-  const restantes = liste.filter(([, i]) => i.statut !== "faite").length;
-  $("ideesInfo").textContent = liste.length
-    ? `${restantes} idée${restantes>1?"s":""} en attente sur ${liste.length}`
-    : "";
-
   box.innerHTML = liste.length
     ? `<ul class="clist">${liste.map(([id, i]) => {
         const faite = i.statut === "faite";
@@ -94,8 +89,9 @@ export function renderIdees(){
   box.querySelectorAll("[data-idee-coche]").forEach(b =>
     b.addEventListener("click", () => { basculerIdee(b.dataset.ideeCoche); emettre("rendre"); }));
   box.querySelectorAll("[data-idee-suppr]").forEach(b =>
-    b.addEventListener("click", () => {
-      if(!confirm("Supprimer cette idée ?")) return;
+    b.addEventListener("click", async () => {
+      if(!await demanderConfirmation("Supprimer cette idée ?",
+        "Elle disparaîtra pour les deux comptes.", {valider:"Supprimer", danger:true})) return;
       supprimerIdee(b.dataset.ideeSuppr);
       emettre("rendre");
     }));

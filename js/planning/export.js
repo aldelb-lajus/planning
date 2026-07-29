@@ -1,12 +1,12 @@
-/* Onglet Exporter (.ics, Google Agenda, PDF) et la sauvegarde .json des Réglages (.json).
+/* Onglet Exporter : .ics, Google Agenda, PDF.
 
-   La sauvegarde .json reste utile malgré la base : c'est le filet indépendant
-   du service, celui qui permet de repartir si le projet Supabase disparaît. */
+   La sauvegarde .json a vécu ici. Elle datait du temps où les données ne
+   vivaient que dans le navigateur ; depuis Supabase, la base est la source de
+   vérité et personne n'a jamais rouvert un de ces fichiers. Retirée le
+   29/07/2026 avec l'import qui allait avec. */
 
 import {$, esc, download} from "../noyau/ui.js";
-import {emettre} from "../noyau/signal.js";
-import {VERSION} from "../noyau/store.js";
-import {pad, iso, isoInput, addDays, dateOfKey, todayKey, keyOfInput,
+import {pad, iso, isoInput, dateOfKey, todayKey, keyOfInput,
         fmtLong, fmtLongY} from "../noyau/dates.js";
 import * as M from "./modele.js";
 
@@ -142,9 +142,6 @@ async function doPdf(mode){
   document.title = old;
 }
 
-/* ---------- sauvegarde .json ---------- */
-const backupPayload = () => JSON.stringify({v:VERSION, codes:M.ref, jours:M.jours, prefs:M.prefs}, null, 1);
-
 export function brancherExport(){
   $("expIcs").addEventListener("click", () => doExport(false));
   $("expGcal").addEventListener("click", () => doExport(true));
@@ -152,32 +149,4 @@ export function brancherExport(){
   $("expPdfList").addEventListener("click", () => doPdf("list"));
   $("expStart").addEventListener("change", renderExport);
   $("expEnd").addEventListener("change", renderExport);
-
-  $("expJson").addEventListener("click", () =>
-    download(backupPayload(), "fa-donnees-" + isoInput(new Date()) + ".json", "application/json"));
-  $("impJsonBtn").addEventListener("click", () => $("impJson").click());
-  $("impJson").addEventListener("change", async e => {
-    const file = e.target.files[0];
-    if(!file) return;
-    try{
-      const s = JSON.parse(await file.text());
-      if(!s || typeof s !== "object" || (!s.codes && !s.jours && !s.plannings)) throw new Error("format");
-      Object.assign(M.ref, s.codes || {});
-      Object.assign(M.jours, s.jours || {});
-      /* anciens fichiers (v2) : les cycles sont aplatis, le plus récent collage gagne */
-      if(Array.isArray(s.plannings))
-        [...s.plannings].sort((a,b) => (a.creeLe||0)-(b.creeLe||0)).forEach(p =>
-          (p.codes||[]).forEach((c,i) => { M.jours[iso(addDays(p.dateDebut, i))] = c; }));
-      if(s.prefs) M.remplacerPrefs(s.prefs);
-      M.migrate();
-      M.saveRef(); M.saveJours(); M.savePrefs();
-      $("lead").value = M.prefs.lead;
-      $("calName").value = M.prefs.calName;
-      emettre("rendre");
-      $("backupMsg").innerHTML = '<p class="msg ok">Données importées.</p>';
-    }catch(err){
-      $("backupMsg").innerHTML = '<p class="msg warn">Fichier illisible — utilise un fichier exporté depuis l\'appli.</p>';
-    }
-    e.target.value = "";
-  });
 }

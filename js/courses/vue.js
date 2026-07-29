@@ -7,7 +7,7 @@
 
    Aucune suppression au glissement du doigt : c'est la fausse manip type. */
 
-import {$, esc} from "../noyau/ui.js";
+import {$, esc, demanderConfirmation, demanderValeur} from "../noyau/ui.js";
 import {emettre} from "../noyau/signal.js";
 import {monId, prenomDe} from "../noyau/supabase.js";
 import * as C from "./modele.js";
@@ -65,8 +65,8 @@ export function renderCourses(){
        <div id="prisCorps"${prisReplies ? " hidden" : ""}>
          <ul class="clist">${pris.map(([id, a]) => ligne(id, a, true)).join("")}</ul>
          <button id="finirCourses">Terminer les courses</button>
-         <p class="hint">Vide les ${pris.length} article${pris.length>1?"s":""} pris et les ajoute
-           aux suggestions pour la prochaine fois.</p>
+         <p class="hint">Retire les ${pris.length} article${pris.length>1?"s":""} pris et les ajoute
+           au catalogue. Ce qui reste à prendre ne bouge pas.</p>
        </div>`
     : "";
 
@@ -95,9 +95,12 @@ function brancherLignes(){
     }));
 
   document.querySelectorAll("[data-editer]").forEach(el => {
-    const ouvrir = () => {
+    const ouvrir = async () => {
       const id = el.dataset.editer;
-      const nouveau = prompt("Renommer l'article :", C.items[id].libelle);
+      const nouveau = await demanderValeur("Renommer l'article", {
+        label: "Nouveau libellé", valeur: C.items[id].libelle,
+        obligatoire: "Il faut un libellé."
+      });
       if(nouveau !== null){ C.renommer(id, nouveau); emettre("rendre"); }
     };
     el.addEventListener("dblclick", ouvrir);
@@ -114,9 +117,11 @@ function brancherLignes(){
   });
 
   const finir = $("finirCourses");
-  if(finir) finir.addEventListener("click", () => {
+  if(finir) finir.addEventListener("click", async () => {
     const n = C.articles(true).length;
-    if(!confirm(`Vider les ${n} article${n>1?"s":""} pris ?\nIls resteront proposés en suggestion.`)) return;
+    if(!await demanderConfirmation(`Retirer les ${n} article${n>1?"s":""} pris ?`,
+      "Ils rejoignent le catalogue et resteront proposés en suggestion.\n"
+      + "Ce qui reste à prendre ne bouge pas.", {valider:"Terminer"})) return;
     C.terminerLesCourses();
     emettre("rendre");
   });

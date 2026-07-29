@@ -40,7 +40,11 @@ export function articles(pris, liste = LISTE_PAR_DEFAUT){
     .sort((a, b) => (a[1].creeLe || "").localeCompare(b[1].creeLe || ""));
 }
 
-/* Suggestions : les produits les plus repris, jamais ceux déjà dans la liste. */
+/* Suggestions : les produits les plus repris, jamais ceux déjà dans la liste.
+   Le catalogue accueille TOUT article pris ; seuls les `n` premiers s'affichent
+   en raccourci — au-delà, la rangée de pastilles occuperait plus de place que
+   la liste elle-même. Ce nombre est annoncé dans le « Comment ça marche » de
+   l'onglet Courses (index.html) : le changer ici demande de l'y corriger. */
 export function suggestions(n = 8, liste = LISTE_PAR_DEFAUT){
   const dedans = new Set(Object.values(items)
     .filter(a => a.liste === liste).map(a => norm(a.libelle)));

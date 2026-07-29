@@ -6,25 +6,42 @@
    dîner samedi ? » se répond d'un coup d'œil. C'est la raison d'avoir réuni le
    planning et l'agenda dans la même appli. */
 
-import {$, esc, ouvrirFeuille} from "../noyau/ui.js";
+import {$, esc, ouvrirFeuille, demanderConfirmation} from "../noyau/ui.js";
 import {emettre} from "../noyau/signal.js";
 import {store, emballer} from "../noyau/store.js";
 import {creerSync} from "../noyau/sync.js";
 import {iso, isoInput, dateFrom, fmtLong, moisLbl} from "../noyau/dates.js";
+import {membres, prenomDe} from "../noyau/supabase.js";
 import * as M from "../planning/modele.js";
 
-export let evenements = {};   // id -> {titre, categorie, debut, fin, heure, note}
+export let evenements = {};   // id -> {titre, categorie, debut, fin, heure, note, assigneA}
 
+/* La couleur du rond qui porte l'émoji vient du CSS, choisie sur `data-cat` :
+   voir la règle `.emo[data-cat=…]` dans css/app.css. */
 export const CATEGORIES = {
-  repas:   {lbl:"Repas",       emoji:"🍽️", c:"var(--matin)"},
-  soiree:  {lbl:"Soirée",      emoji:"🥂", c:"var(--aprem)"},
-  vacances:{lbl:"Vacances",    emoji:"🌴", c:"var(--vacances)"},
-  rdv:     {lbl:"Rendez-vous", emoji:"📌", c:"var(--nuit)"},
-  autre:   {lbl:"Autre",       emoji:"✨", c:"var(--autre)"}
+  repas:   {lbl:"Repas",       emoji:"🍽️"},
+  soiree:  {lbl:"Soirée",      emoji:"🎉"},
+  vacances:{lbl:"Vacances",    emoji:"🌴"},
+  rdv:     {lbl:"Rendez-vous", emoji:"📌"},
+  autre:   {lbl:"Autre",       emoji:"✨"}
 };
 
 let vue = "liste";              // "liste" | "grille"
 let moisAffiche = null;         // 1er du mois montré en grille
+
+/* Filtre par assignation. Les cases sont ÉTANCHES : « Alice » ne montre que ce
+   qui lui est assigné, jamais le commun. C'est ce qui fait de « Commun » une
+   case comme les autres et non un fourre-tout qui déborderait partout ; pour
+   voir sa journée entière on repasse par « Tout », qui est le premier bouton.
+
+   Une seule dimension, comme pour les rappels — pas de croisement avec le type
+   d'événement. Valeurs : "tout" · "commun" · "moi:<id>". */
+let filtre = "tout";
+
+const concerne = e =>
+    filtre === "tout"   ? true
+  : filtre === "commun" ? !e.assigneA
+  : e.assigneA === filtre.slice(4);
 
 const save = () => { store.set("agenda:evenements", emballer(evenements)); emettre("modifie"); };
 export const remplacerEvenements = o => { evenements = o || {}; };
@@ -34,17 +51,18 @@ export function creerSyncAgenda({statut, apresLecture}){
   return creerSync({
     collections: [{
       nom:"evenements", table:"evenement", cle:"id",
-      colonnes:"id, titre, categorie, debut, fin, heure, note, cree_par",
+      colonnes:"id, titre, categorie, debut, fin, heure, note, assigne_a, cree_par",
       donnees:   () => evenements,
       remplacer: o  => remplacerEvenements(o),
       versLigne: (id, e) => ({
         id, titre:e.titre, categorie:e.categorie, debut:e.debut,
-        fin:e.fin || null, heure:e.heure || null, note:e.note || ""
+        fin:e.fin || null, heure:e.heure || null, note:e.note || "",
+        assigne_a:e.assigneA || null
       }),
       depuisLigne: r => [r.id, {
         titre:r.titre, categorie:r.categorie, debut:r.debut,
         fin:r.fin, heure:r.heure ? String(r.heure).slice(0,5) : null,
-        note:r.note || "", creePar:r.cree_par
+        note:r.note || "", assigneA:r.assigne_a, creePar:r.cree_par
       }]
     }],
     statut,
@@ -60,16 +78,20 @@ const dernierJour = e => e.fin || e.debut;
 export function aVenir(){
   const auj = isoInput(new Date());
   return Object.entries(evenements)
-    .filter(([, e]) => dernierJour(e) >= auj)
+    .filter(([, e]) => dernierJour(e) >= auj && concerne(e))
     .sort((a, b) => a[1].debut.localeCompare(b[1].debut)
                  || (a[1].heure || "").localeCompare(b[1].heure || ""));
 }
 
-export const passes = () => Object.keys(evenements).length - aVenir().length;
+/* Comptés sur ce que le filtre laisse passer, pour que la ligne de contexte de
+   l'en-tête parle bien de ce qui est à l'écran. */
+export const passes = () =>
+  Object.values(evenements).filter(concerne).length - aVenir().length;
 
-/* Événements couvrant un jour donné, plage comprise. */
+/* Événements couvrant un jour donné, plage comprise. Filtrés eux aussi : sans
+   ça, choisir « Alice » viderait la liste mais laisserait la grille pleine. */
 export const duJour = dateIso => Object.entries(evenements)
-  .filter(([, e]) => e.debut <= dateIso && dernierJour(e) >= dateIso)
+  .filter(([, e]) => e.debut <= dateIso && dernierJour(e) >= dateIso && concerne(e))
   .sort((a, b) => (a[1].heure || "").localeCompare(b[1].heure || ""));
 
 /* Poste de Fab un jour donné. Rend null si le planning ne couvre pas ce jour —
@@ -96,7 +118,8 @@ export function ajouterEvenement(champs){
   evenements[id] = {
     titre:champs.titre.trim(), categorie:champs.categorie || "autre",
     debut:champs.debut, fin:champs.fin || null, heure:champs.heure || null,
-    note:(champs.note || "").trim()
+    note:(champs.note || "").trim(),
+    assigneA: champs.assigneA || null
   };
   save();
   return id;
@@ -107,7 +130,8 @@ export function modifierEvenement(id, champs){
   Object.assign(evenements[id], {
     titre:champs.titre.trim(), categorie:champs.categorie,
     debut:champs.debut, fin:champs.fin || null, heure:champs.heure || null,
-    note:(champs.note || "").trim()
+    note:(champs.note || "").trim(),
+    assigneA: champs.assigneA || null
   });
   save();
   return true;
@@ -115,11 +139,21 @@ export function modifierEvenement(id, champs){
 
 export function supprimerEvenement(id){ delete evenements[id]; save(); }
 
+/* ---------- assignation ----------
+   « Commun » d'abord, et c'est la valeur par défaut : la plupart des événements
+   concernent les deux. Un événement assigné à quelqu'un n'est PAS commun — les
+   deux cases sont étanches, dans le menu comme dans le filtre. */
+function optionsPersonnes(choisi){
+  return `<option value="">Commun</option>`
+    + membres().map(m =>
+        `<option value="${m.id}"${m.id === choisi ? " selected" : ""}>${esc(m.prenom)}</option>`).join("");
+}
+
 /* ---------- feuille de modification ---------- */
 export function ouvrirEditeur(id, jourParDefaut){
   const e = id ? evenements[id] : {
     titre:"", categorie:"autre", debut:jourParDefaut || isoInput(new Date()),
-    fin:null, heure:null, note:""
+    fin:null, heure:null, note:"", assigneA:null
   };
   const opt = Object.entries(CATEGORIES).map(([k, c]) =>
     `<option value="${k}"${k === e.categorie ? " selected" : ""}>${c.emoji} ${c.lbl}</option>`).join("");
@@ -134,18 +168,22 @@ export function ouvrirEditeur(id, jourParDefaut){
     </div>
     <div class="row">
       <div><label for="edCat">Type</label><select id="edCat">${opt}</select></div>
-      <div><label for="edNote">Note</label><input type="text" id="edNote" value="${esc(e.note)}" autocomplete="off"></div>
+      <div><label for="edQui">Pour qui</label><select id="edQui">${optionsPersonnes(e.assigneA)}</select></div>
     </div>
+    <label for="edNote">Note</label>
+    <input type="text" id="edNote" value="${esc(e.note)}" autocomplete="off">
     <div id="edMsg"></div>
     ${id ? `<div class="row"><button class="ghost danger" id="edSuppr">Supprimer cet événement</button></div>` : ""}
   `, (ov, fermer) => {
     const lire = () => ({
       titre:$("edTitre").value, categorie:$("edCat").value, debut:$("edDebut").value,
-      fin:$("edFin").value, heure:$("edHeure").value, note:$("edNote").value
+      fin:$("edFin").value, heure:$("edHeure").value, note:$("edNote").value,
+      assigneA:$("edQui").value
     });
 
-    if(id) ov.querySelector("#edSuppr").addEventListener("click", () => {
-      if(!confirm(`Supprimer « ${e.titre} » ?`)) return;
+    if(id) ov.querySelector("#edSuppr").addEventListener("click", async () => {
+      if(!await demanderConfirmation(`Supprimer « ${e.titre} » ?`,
+        "Cet événement sera retiré de l'agenda.", {valider:"Supprimer", danger:true})) return;
       supprimerEvenement(id);
       fermer();
       emettre("rendre");
@@ -187,9 +225,16 @@ function ligneEvenement(id, e){
           p.segs.length ? " · " + p.segs.map(s => s.debut + "–" + s.fin).join(" · ") : ""}</span>`;
   }
 
+  /* Le prénom reste affiché quel que soit le filtre — même règle que les
+     rappels : l'information ne doit jamais dépendre de la vue choisie.
+     Titre et prénom sont enfermés ensemble dans « ctitre », sans quoi « clib »,
+     qui empile ses enfants en colonne, renverrait le prénom à la ligne. */
+  const qui = prenomDe(e.assigneA);
+
   return `<li class="citem" data-evt="${id}" role="button" tabindex="0">
-    <span class="emo" title="${esc(cat.lbl)}">${cat.emoji}</span>
-    <span class="clib">${esc(e.titre)}
+    <span class="emo" data-cat="${esc(e.categorie)}" title="${esc(cat.lbl)}">${cat.emoji}</span>
+    <span class="clib">
+      <span class="ctitre">${esc(e.titre)}${qui ? `<span class="qui">${esc(qui)}</span>` : ""}</span>
       <small class="par">${esc(quand)}</small>
       ${poste}${e.note ? `<small class="par">${esc(e.note)}</small>` : ""}</span>
   </li>`;
@@ -198,7 +243,9 @@ function ligneEvenement(id, e){
 function listeHtml(){
   const liste = aVenir();
   if(!liste.length)
-    return `<p class="msg">Rien de prévu — ajoute vacances, soirées, repas ou rendez-vous.</p>`;
+    return filtre === "tout"
+      ? `<p class="msg">Rien de prévu — ajoute vacances, soirées, repas ou rendez-vous.</p>`
+      : `<p class="msg">Rien à venir dans ce filtre.</p>`;
   let h = "", moisCourant = "";
   liste.forEach(([id, e]) => {
     const m = moisLbl(dateFrom(e.debut));
@@ -235,13 +282,13 @@ function grilleHtml(){
     const evts = duJour(cle);
     const p = posteDe(cle);
 
-    /* Bande étroite sur le flanc gauche = poste de Fab. Sa couleur est celle du
-       type de poste, atténuée par l'opacité — la case reste au contenu, la
-       disponibilité se lit du coin de l'œil.
-       (L'opacité passe par une propriété à part : « var(--matin)1F » est une
-       règle invalide, on ne colle pas une transparence derrière une variable.) */
-    const bande = p && !p.libre
-      ? `<i class="abande" style="background:${M.TYPES[p.type].c}"></i>` : "";
+    /* Le FOND de la case dit le poste de Fab — une bande de 5 px au flanc
+       gauche était trop étroite pour se voir, et assez large pour rogner la
+       place des événements. La teinte « douce » de chaque type est un jeton à
+       part (--matin-doux…) : c'est ce qui la rend juste en clair comme en
+       sombre, là où une transparence appliquée à la couleur pleine virait au
+       gris dans un cas sur deux. */
+    const poste = p && !p.libre ? ` data-poste="${esc(p.type)}"` : "";
 
     /* Trois émojis tiennent et se lisent ; un titre à sept colonnes sur un
        téléphone se réduirait à « Dîne… ». Chacun ouvre son événement. */
@@ -257,28 +304,67 @@ function grilleHtml(){
       + (evts.length ? " — " + evts.map(([, e]) => e.titre).join(", ") : "");
 
     h += `<div class="acell${horsMois ? " hors" : ""}${cle === auj ? " today" : ""}"
-            data-jour="${cle}" title="${esc(tt)}">
-        ${bande}
-        <span class="anum">${d.getDate()}${p && !p.libre ? `<b>${esc(p.code)}</b>` : ""}</span>
+            data-jour="${cle}"${poste} title="${esc(tt)}">
+        <span class="anum">${d.getDate()}${
+          p && !p.libre ? `<b data-poste="${esc(p.type)}">${esc(p.code)}</b>` : ""}</span>
         <span class="aevts">${vus}${evts.length > 3 ? `<b class="aplus">+${evts.length-3}</b>` : ""}</span>
       </div>`;
   }
-  return h + `</div><p class="hint" style="margin-top:10px">Bande de couleur à gauche&nbsp;:
-    Fab travaille, avec son code. Émojis&nbsp;: les événements — appuie dessus pour
-    en modifier un, ou ailleurs dans la case pour voir le jour entier.</p>`;
+  return h + `</div>`;
 }
 
 /* ---------- rendu ---------- */
+/* Barre de filtres : « Tout », puis « Commun », puis un bouton par compte.
+   Comptée sur TOUS les événements, pas seulement ceux à venir : en vue grille
+   on remonte des mois passés, et un bouton qui disparaîtrait en chemin ferait
+   croire que le filtre a sauté. Un compte sans aucun événement n'a pas de
+   bouton — une barre dont la moitié des entrées mènent au vide n'aide personne. */
+function renderFiltres(){
+  const barre = $("agendaFiltres");
+  const tous = Object.values(evenements);
+  if(!barre) return;
+
+  const compte = cle => tous.filter(e =>
+    cle === "commun" ? !e.assigneA : e.assigneA === cle.slice(4)).length;
+
+  const boutons = [{cle:"tout", lbl:"Tout", n:tous.length}];
+  if(compte("commun")) boutons.push({cle:"commun", lbl:"Commun", n:compte("commun"), groupe:true});
+  let debutFamille = !boutons.some(b => b.groupe);
+  membres().forEach(m => {
+    const cle = "moi:" + m.id;
+    if(!compte(cle)) return;
+    boutons.push({cle, lbl:m.prenom, n:compte(cle), groupe:debutFamille});
+    debutFamille = false;
+  });
+
+  /* le filtre courant a pu disparaître : son dernier événement vient d'être
+     supprimé, ou de changer de personne */
+  if(!boutons.some(b => b.cle === filtre)) filtre = "tout";
+
+  /* Un seul bouton (« Tout ») : il n'y a rien à filtrer, la barre ne sert qu'à
+     occuper de la place. */
+  barre.hidden = boutons.length < 2;
+  barre.innerHTML = boutons.map(b =>
+    (b.groupe ? `<span class="fsep" aria-hidden="true"></span>` : "")
+    + `<button data-f="${esc(b.cle)}" aria-current="${filtre === b.cle ? "page" : "false"}">${esc(b.lbl)} ${b.n}</button>`
+  ).join("");
+
+  barre.querySelectorAll("[data-f]").forEach(b =>
+    b.addEventListener("click", () => { filtre = b.dataset.f; renderAgenda(); }));
+}
+
 export function renderAgenda(){
   const box = $("agendaListe");
   if(!box) return;
+  renderFiltres();
   const liste = aVenir();
   const nbPasses = passes();
 
-  $("agendaInfo").innerHTML = liste.length
-    ? `${liste.length} à venir`
-      + (nbPasses ? ` <span style="color:var(--ink-soft)">· ${nbPasses} passé${nbPasses>1?"s":""} masqué${nbPasses>1?"s":""}</span>` : "")
-    : (nbPasses ? `Rien à venir · ${nbPasses} événement${nbPasses>1?"s":""} passé${nbPasses>1?"s":""}` : "");
+  /* Ligne de contexte de l'en-tête : elle est en petites capitales, donc elle
+     doit tenir sur une ligne — d'où le compte sec plutôt qu'une phrase. */
+  $("agendaInfo").textContent = liste.length
+    ? `${liste.length} à venir` + (nbPasses ? ` · ${nbPasses} passés` : "")
+    : (nbPasses ? `Rien à venir · ${nbPasses} passés` : "Rien de prévu");
 
   $("agVueGrille").setAttribute("aria-pressed", vue === "grille");
   $("agVueListe").setAttribute("aria-pressed", vue === "liste");
@@ -319,12 +405,19 @@ function ouvrirJour(cle){
     ? (p.libre ? `<p class="msg ok">Fab est en ${esc(M.TYPES[p.type].lbl.toLowerCase())}.</p>`
                : `<p class="msg">Fab travaille — ${esc(p.code)}${p.segs.length ? " · " + p.segs.map(s => s.debut+"–"+s.fin).join(" · ") : ""}.</p>`)
     : "";
+  /* Le prénom s'affiche ici comme dans la liste et comme dans les rappels : une
+     même information ne doit pas apparaître à un endroit et disparaître à un
+     autre. « ctitre » réunit titre et prénom sur une ligne — « clib » empile ses
+     enfants en colonne, un prénom posé à côté tomberait à la ligne suivante. */
   const corps = evts.length
     ? `<ul class="clist">${evts.map(([id, e]) => {
         const cat = CATEGORIES[e.categorie] || CATEGORIES.autre;
+        const qui = prenomDe(e.assigneA);
         return `<li class="citem" data-evt="${id}" role="button" tabindex="0">
-          <span class="emo">${cat.emoji}</span>
-          <span class="clib">${esc(e.titre)}${e.heure ? `<small class="par">${e.heure}</small>` : ""}</span>
+          <span class="emo" data-cat="${esc(e.categorie)}">${cat.emoji}</span>
+          <span class="clib">
+            <span class="ctitre">${esc(e.titre)}${qui ? `<span class="qui">${esc(qui)}</span>` : ""}</span>
+            ${e.heure ? `<small class="par">${esc(e.heure)}</small>` : ""}</span>
         </li>`;
       }).join("")}</ul>`
     : `<p class="msg">Rien de prévu ce jour-là.</p>`;

@@ -3,14 +3,39 @@
 
 import {$, esc} from "../noyau/ui.js";
 import {emettre} from "../noyau/signal.js";
-import {pad, iso, isoInput, dateOfKey, todayKey, fmtLong, fmtLongY, fmtShort,
+import {pad, iso, isoInput, dateOfKey, todayKey, fmtLong, fmtShort,
         moisLbl, minusMinutes} from "../noyau/dates.js";
 import * as M from "./modele.js";
 import {suivreFinPlanning} from "./export.js";
 
 let planMode = "grid";   // vue du planning : "grid" | "list"
 
-/* ================= prochain réveil (bandeau global) ================= */
+/* ================= prochain réveil (bandeau global) =================
+   Le plus gros geste de la refonte : c'est l'écran ouvert vingt fois par jour,
+   et la seule question qu'on s'y pose est « à quelle heure je me lève ? ».
+   Elle mérite la page entière, en 62 px, pas une ligne de plus parmi d'autres. */
+
+/* « dans 14 h » répond mieux que « jeudi 05:20 » à la question posée le soir :
+   est-ce que je peux encore veiller ? On change d'unité quand le chiffre
+   deviendrait absurde — « dans 96 h » ne se lit pas. */
+function dansCombien(quand){
+  const min = Math.round((quand - new Date()) / 60000);
+  if(min < 60) return `dans ${Math.max(1, min)} min`;
+  const h = Math.round(min / 60);
+  if(h < 36) return `dans ${h} h`;
+  return `dans ${Math.round(h / 24)} jours`;
+}
+
+/* « aujourd'hui » / « demain » plutôt que la date, quand c'est l'un des deux :
+   c'est ce qu'on se dit dans sa tête. */
+function quandLong(dt){
+  const k = iso(dt), tk = todayKey();
+  const demain = new Date(); demain.setDate(demain.getDate() + 1);
+  if(k === tk) return "aujourd'hui, " + fmtLong(dt);
+  if(k === iso(demain)) return "demain, " + fmtLong(dt);
+  return fmtLong(dt);
+}
+
 export function renderNext(){
   const box = $("next");
   const keys = M.planKeys();
@@ -28,24 +53,36 @@ export function renderNext(){
     for(const s of M.segsOf(k)){
       if(!s.alarm) continue;                     /* créneau sans réveil (1er créneau de N) */
       const w = minusMinutes(dt, s.debut, M.prefs.lead);
-      if(w > now && (!best || w < best.w)) best = {w, code, debut:s.debut};
+      if(w > now && (!best || w < best.w)) best = {w, code, debut:s.debut, fin:s.fin, type:k.type};
     }
   }
   if(best){
-    box.innerHTML = `<div class="next"><div class="lbl">Prochain réveil</div>
+    box.innerHTML = `<div class="next">
+      <div class="tete">
+        <div class="lbl">Prochain réveil</div>
+        <div class="dans">${esc(dansCombien(best.w))}</div>
+      </div>
       <div class="hour">${pad(best.w.getHours())}:${pad(best.w.getMinutes())}</div>
-      <div class="det">${fmtLong(best.w)} · poste ${esc(best.code)} à ${best.debut}</div></div>`;
+      <div class="det">${esc(quandLong(best.w))}</div>
+      <div class="poste">
+        <span class="chip" data-poste="${esc(best.type)}">${esc(best.code)}</span>
+        <span class="det">${esc(M.TYPES[best.type].lbl)} · prise de poste ${esc(best.debut)}${
+          best.fin && best.fin !== best.debut ? " → " + esc(best.fin) : ""}</span>
+      </div>
+    </div>`;
     return;
   }
   /* pas de réveil à venir : montrer le prochain jour de repos/vacances, sinon rien */
   const nk = keys.find(k => k >= tk);
   if(nk && M.ref[M.jours[nk]] && M.NOALARM(M.ref[M.jours[nk]].type)){
-    box.innerHTML = `<div class="next rest"><div class="lbl">Prochain jour</div>
-      <div class="hour">${M.TYPES[M.ref[M.jours[nk]].type].lbl}</div>
-      <div class="det">${fmtLong(dateOfKey(nk))} · pas de réveil</div></div>`;
+    box.innerHTML = `<div class="next rest">
+      <div class="tete"><div class="lbl">Prochain jour</div></div>
+      <div class="hour">${esc(M.TYPES[M.ref[M.jours[nk]].type].lbl)}</div>
+      <div class="det">${esc(quandLong(dateOfKey(nk)))} · pas de réveil</div></div>`;
     return;
   }
-  box.innerHTML = `<div class="next rest"><div class="lbl">Prochain réveil</div>
+  box.innerHTML = `<div class="next rest">
+    <div class="tete"><div class="lbl">Prochain réveil</div></div>
     <div class="hour">Rien à venir</div>
     <div class="det">Le planning est terminé — importe la suite.</div></div>`;
 }
@@ -76,12 +113,15 @@ export function gridHtml(k0, k1){
       const type = st === "inconnu" ? null : k.type;
       let cls = "cell" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
       if(st === "inconnu") cls += " vide";
-      const bg = type ? `background:${M.TYPES[type].c}` : "";
+      /* La couleur du poste ne s'écrit plus en style : `data-poste` laisse le
+         CSS choisir le fond ET l'encre qui se lit dessus — du blanc sur l'ocre
+         du matin était illisible — et bascule tout seul en mode sombre. */
+      const poste = type ? ` data-poste="${esc(type)}"` : "";
       const hr = (st === "ok") ? M.segsOf(k).map(s => `<small>${s.debut}${s.fin&&s.fin!==s.debut?"–"+s.fin:""}</small>`).join("") : "";
       const mark = (st === "sansheure" || st === "inconnu") ? '<span class="mark" title="Pas d\'horaire">!</span>' : "";
       const titles = {inconnu:"code inconnu", sansheure:"horaire manquant"};
       const title = dt.toLocaleDateString("fr-FR") + (titles[st] ? " — "+titles[st] : "") + " — appuie pour modifier";
-      h += `<div class="${cls}" data-key="${key}" style="${bg}" title="${title}">${dnum}${esc(c)||"·"}${hr}${mark}</div>`;
+      h += `<div class="${cls}" data-key="${key}"${poste} title="${title}">${dnum}${esc(c)||"·"}${hr}${mark}</div>`;
     }
   }
   return h + "</div>";
@@ -100,9 +140,10 @@ export function listHtml(k0, k1){
     const c = M.jours[key];
     const k = c ? M.ref[c] : null;
     let cls = "drow" + (key<tk ? " past" : "") + (key===tk ? " today" : "");
-    const chipBg = (st==="off" || st==="vide" || st==="inconnu") ? "var(--rule);color:var(--ink-soft)" : M.TYPES[k.type].c;
+    /* sans poste connu, la pastille garde sa teinte neutre par défaut */
+    const chipPoste = (st==="off" || st==="vide" || st==="inconnu") ? "" : ` data-poste="${esc(k.type)}"`;
     let det = "", lever = "";
-    if(st === "off" || st === "vide") det = `<span style="color:var(--ink-soft)">à remplir — appuie pour choisir le poste</span>`;
+    if(st === "off" || st === "vide") det = `à remplir — appuie pour choisir le poste`;
     else if(st === "inconnu")    det = `<span class="warn-t">code inconnu — pas de réveil</span>`;
     else if(st === "repos" || st === "vacances") det = M.TYPES[k.type].lbl;
     else if(st === "sansheure")  det = `<span class="warn-t">horaire manquant — ne sonnera pas</span>`;
@@ -116,10 +157,25 @@ export function listHtml(k0, k1){
       lever = levers.length ? `<span class="lever">${levers.join(" · ")}</span>` : "";
     }
     h += `<div class="${cls}" data-key="${key}"><span class="ld">${fmtShort(dt)}</span>
-      <span class="chip" style="background:${chipBg}">${esc(c||"")||"·"}</span>
+      <span class="chip"${chipPoste}>${esc(c||"")||"·"}</span>
       <span class="det">${det}</span>${lever}</div>`;
   }
   return h + "</div>";
+}
+
+/* Légende de la grille : sans elle, le fond teinté d'une case n'est qu'une
+   couleur. Bâtie sur les postes réellement présents dans la période affichée —
+   annoncer « Nuit » un mois sans nuit n'apprend rien et occupe une ligne. */
+function legendeHtml(keys){
+  const vus = [];
+  keys.forEach(k => {
+    const c = M.jours[k], ref = c ? M.ref[c] : null;
+    if(ref && !vus.includes(ref.type)) vus.push(ref.type);
+  });
+  if(vus.length < 2) return "";
+  const ordre = ["matin","aprem","jour","nuit","repos","vacances","autre"];
+  return `<div class="legende">` + ordre.filter(t => vus.includes(t)).map(t =>
+    `<span><i data-poste="${t}"></i>${esc(M.TYPES[t].lbl)}</span>`).join("") + `</div>`;
 }
 
 /* ================= onglet Planning ================= */
@@ -140,11 +196,14 @@ export function renderPlanning(){
   const kMon = iso(lundi);
   const kStart = (k0 < kMon && k1 >= kMon) ? kMon : k0;
   const visibles = keys.filter(k => k >= kStart);
-  const masques = keys.length - visibles.length;
 
-  info.innerHTML = `Du <strong>${fmtLong(dateOfKey(kStart))}</strong> au <strong>${fmtLongY(dateOfKey(k1))}</strong>
-    · ${visibles.length} jours`
-    + (masques ? ` <span style="color:var(--ink-soft)">· ${masques} jour${masques>1?"s":""} passé${masques>1?"s":""} masqué${masques>1?"s":""}</span>` : "");
+  /* Ligne de contexte de l'en-tête : en petites capitales, elle doit tenir sur
+     une ligne. La plage complète (« du mercredi 29 juillet au dimanche 17 août
+     2026 ») en occupait trois sur un téléphone — le compte de jours et la date
+     de fin disent la même chose en un coup d'œil. Le nombre de jours passés
+     masqués n'y figure pas : on ne les cherche pas, et l'annoncer donnait
+     l'impression qu'il manquait quelque chose. */
+  info.textContent = `${visibles.length} jours · jusqu'au ${fmtShort(dateOfKey(k1))}`;
 
   const miss = visibles.filter(k => ["inconnu","sansheure"].includes(M.statusOf(k))).length;
   /* « à remplir » couvre toute la période affichée, trous d'import compris : à
@@ -167,7 +226,9 @@ export function renderPlanning(){
 
   $("viewGrid").setAttribute("aria-pressed", planMode === "grid");
   $("viewList").setAttribute("aria-pressed", planMode === "list");
-  view.innerHTML = planMode === "list" ? listHtml(kStart, k1) : gridHtml(kStart, k1);
+  view.innerHTML = planMode === "list"
+    ? listHtml(kStart, k1)
+    : gridHtml(kStart, k1) + legendeHtml(visibles);
   $("gridHint").style.display = planMode === "list" ? "none" : "";
 
   view.querySelectorAll("[data-key]").forEach(el =>
@@ -189,15 +250,15 @@ export function openDayEditor(key){
     const info = M.NOALARM(type) ? M.TYPES[type].lbl
       : (k && k.debut ? k.debut + (k.fin?"–"+k.fin:"") : "horaire à régler");
     return `<button class="daychoice" data-set="${esc(c)}">
-      <span class="chip" style="background:${M.TYPES[type].c}">${esc(c)}</span>
+      <span class="chip" data-poste="${esc(type)}">${esc(c)}</span>
       <span>${info}</span></button>`;
   };
   ov.innerHTML = `<div class="sheet" role="dialog" aria-label="Modifier le jour">
     <p class="sheet-h">${fmtLong(dt).replace(/^./, x => x.toUpperCase())}</p>
     <div class="daygrid">
       ${codesList.map(choix).join("")}
-      <button class="daychoice" data-set="Vacs"><span class="chip" style="background:var(--vacances)">V</span><span>Vacs</span></button>
-      <button class="daychoice" data-set=""><span class="chip" style="background:transparent;border:1.5px dashed var(--ink-soft);color:var(--ink-soft)">·</span><span>À remplir</span></button>
+      <button class="daychoice" data-set="Vacs"><span class="chip" data-poste="vacances">V</span><span>Vacs</span></button>
+      <button class="daychoice" data-set=""><span class="chip">·</span><span>À remplir</span></button>
     </div>
     <div class="btns" style="justify-content:flex-end;margin-top:14px">
       <button class="ghost" data-annuler="1">Annuler</button>
@@ -240,12 +301,6 @@ export function openDayEditor(key){
 export function brancherPlanning(){
   $("viewGrid").addEventListener("click", () => { planMode = "grid"; renderPlanning(); });
   $("viewList").addEventListener("click", () => { planMode = "list"; renderPlanning(); });
-
-  $("clearPlan").addEventListener("click", () => {
-    if(!Object.keys(M.jours).length) return;
-    if(!confirm("Effacer tout le planning ?\nLes codes et leurs horaires sont conservés. Les événements déjà envoyés au calendrier ne seront pas retirés.")) return;
-    M.viderJours(); M.saveJours(); emettre("rendre");
-  });
 
   /* Ajouter une semaine : 7 jours à remplir après le dernier jour planifié (ou à
      partir du lundi de cette semaine si le planning est vide). */

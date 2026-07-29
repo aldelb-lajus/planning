@@ -113,6 +113,9 @@ est la source de vérité.
 sur 375 px). Une opération qui n'a de sens que pour un module reste dans ce
 module, en sous-onglet : Importer, Exporter et Codes sont des sous-onglets du
 Planning. Réglages ne garde que ce qui concerne l'appli et les deux comptes.
+La barre du bas porte une icône par usage ; les sous-onglets sont des pilules,
+volontairement plus discrètes — un soulignement leur donnait l'allure d'une
+seconde barre principale.
 
 **Cocher ne supprime jamais.** Vaut pour les courses et les idées : l'élément
 se barre et descend, la purge est un geste explicite. Toute suppression laisse
@@ -125,13 +128,47 @@ personne *ou* par catégorie, dans une même barre séparée d'un trait — pas 
 barres qui se combinent. À deux comptes, croiser les dimensions produit une
 vingtaine de combinaisons dont presque aucune ne sert. Et l'information filtrée
 (le prénom) reste affichée sur chaque ligne, pour ne jamais dépendre de la vue.
+L'agenda se filtre de la même façon, par personne, et sa vue grille suit le
+filtre comme la liste — sinon choisir « Alice » viderait l'une en laissant
+l'autre pleine.
+
+**« Commun », et les cases sont étanches.** Un rappel ou un événement qui n'est
+à personne en particulier est *commun* — pas « personne », qui se lisait comme
+« ça n'intéresse personne ». C'est la valeur par défaut, et elle vient en tête
+partout : dans le menu « Pour qui », dans la barre de filtres, dans les deux
+modules. Filtrer sur « Alice » ne montre QUE ce qui lui est assigné, jamais le
+commun ; c'est ce qui fait de « Commun » une case comme les autres plutôt qu'un
+fourre-tout qui déborderait dans toutes les vues. Pour voir sa journée entière,
+on repasse par « Tout », qui est le premier bouton. Décidé avec Alice le
+29/07/2026 — ne pas rendre le filtre inclusif sans le lui redemander.
 
 **L'appli s'utilise debout, à une main.** Zones tactiles d'au moins 44 px.
+La coche des courses fait 34 px à l'œil — au-delà elle écraserait la ligne — mais
+44 au doigt, étendue par un `::after` transparent. Le carré et la cible ne sont
+pas forcés d'avoir la même taille.
 
-**Vérifier le rendu, pas la déclaration.** `var(--matin)1F` est une règle CSS
-invalide — on ne colle pas une transparence hexadécimale derrière une variable ;
-il faut une propriété `opacity` à part. Ce bug a survécu à un test qui se
-contentait de lire l'attribut `style` : mesurer avec `getComputedStyle`.
+**Les textes d'aide passent sous un « ? ».** Ils sont justes, ils n'ont pas à
+être relus tous les jours : `<details class="aide">`. Ce qui reste visible, c'est
+une ligne — un `.note` — et la ligne de contexte chiffrée de l'en-tête (`.kicker`).
+Celle-ci est en petites capitales : elle doit tenir sur une ligne à 375 px, donc
+un compte sec, pas une phrase.
+
+**Vérifier le rendu, pas la déclaration.** Trois pannes déjà attrapées comme ça,
+et aucune ne se voyait à la lecture :
+
+- `var(--matin)1F` est une règle CSS invalide — on ne colle pas une transparence
+  hexadécimale derrière une variable ; il faut une propriété `opacity` à part.
+  Ce bug a survécu à un test qui se contentait de lire l'attribut `style`.
+- `[data-poste=matin]` et `.cell` pèsent le même poids. Le bloc des couleurs de
+  postes était écrit en haut de la feuille, avec les autres jetons : à
+  spécificité égale, c'est la dernière règle écrite qui gagne, et pas une seule
+  couleur de poste ne s'appliquait. Il vit donc **en fin de fichier**, après les
+  composants qu'il repeint.
+- Le contraste. La maquette place `#A19786` sur la crème (2,4) et une encre crème
+  sur `#C67139` (3,3) : illisible à 10 px sur un téléphone tenu à bout de bras.
+  Les jetons ont été réaccordés jusqu'à 4,5 mesurés, en gardant les teintes.
+
+Mesurer avec `getComputedStyle`, et calculer les ratios plutôt que les estimer.
 
 **Jamais de page blanche muette.** Les deux écrans partent `hidden`, donc une
 exception au démarrage ne montrait rien du tout — et l'autre compte n'a alors
@@ -141,15 +178,63 @@ Il est posé **en phase de capture** : un échec de chargement de fichier ne
 remonte pas jusqu'à `window` autrement. Vérifié en provoquant les deux pannes,
 pas en relisant le code.
 
+Corollaire : ce qui est distant et facultatif porte `data-optionnel`, et le
+gestionnaire l'ignore. Les polices Google en sont : hors réseau elles ne se
+chargent pas, l'appli retombe sur ses substituts — ce n'est pas une panne de
+démarrage, et l'annoncer comme telle serait pire que de se taire. Les deux cas
+sont vérifiés en provoquant l'échec, pas en relisant la condition.
+
 **Heures locales, jamais UTC** — sinon les postes se décalent d'une heure deux
 fois par an.
+
+## Apparence
+
+Direction « Organic », reprise d'une maquette Claude Design. La crème est le sol
+de l'appli ; le blanc cassé ne sert qu'à ce qui est posé dessus. **Les blocs
+`.step` ne sont plus des cartes** — un titre et de l'espace séparent deux sujets
+aussi bien qu'une bordure, sans empiler des rectangles blancs identiques.
+Caprasimo pour les titres d'écran et les chiffres qui comptent (l'heure de lever
+en 62 px), Figtree pour tout le reste.
+
+**Toute la couleur vit dans `css/app.css`, en variables.** Le JS ne pose que
+`data-poste="matin"` ou `data-cat="repas"` ; c'est le CSS qui choisit le fond
+*et* l'encre lisible dessus. Une seule valeur ne suffisait pas : du blanc sur
+l'ocre du matin est illisible, du noir sur l'indigo de la nuit aussi. Chaque type
+porte donc trois jetons — `--matin`, `--matin-encre`, `--matin-doux` (le fond
+atténué des cases d'agenda). **Ne pas réintroduire de couleur dans le JS** : deux
+tables auraient divergé au premier changement de palette, et le mode sombre
+serait à écrire deux fois.
+
+**Le mode sombre se choisit dans Réglages → Apparence** (Auto · Clair · Sombre),
+`js/noyau/theme.js`. Il pose `data-theme` sur `<html>`, ce qui ne fait que
+redéfinir les mêmes variables : jamais une seconde feuille de style. « Auto »
+n'écrit aucun attribut et laisse `prefers-color-scheme` décider — d'où le bloc de
+jetons sombres écrit deux fois, un sélecteur ne pouvant pas couvrir les deux
+chemins.
+
+Deux raisons de ne pas passer par `store` ni par la base pour ce réglage : il
+doit s'appliquer **avant la première peinture** (un petit script synchrone en
+tête d'`index.html` lit `localStorage`, sinon l'appli s'ouvre en blanc puis
+bascule), et c'est un réglage d'appareil — Fab peut vouloir le sombre sans
+l'imposer à Alice. `theme.js` écrit donc au même endroit que ce script.
+
+L'impression force les jetons clairs : une grille imprimée depuis le mode sombre
+sortirait en aplats bruns qui vident la cartouche.
 
 ## À savoir
 
 - `data.json` à la racine est l'ancien mécanisme de synchronisation, remplacé
   par Supabase. Conservé comme filet, plus lu par personne.
+- **Il n'y a plus de sauvegarde `.json` dans Réglages.** Elle datait du temps où
+  les données ne vivaient que dans le navigateur ; depuis Supabase, la base est
+  la source de vérité et aucun de ces fichiers n'a jamais été rouvert. Retirée
+  le 29/07/2026 avec son import. Si la question du filet indépendant revient,
+  c'est un export à refaire, pas à déterrer — il devrait couvrir les six tables,
+  pas seulement le planning comme l'ancien.
 - Ce qui manque : notifications (les rappels ne préviennent pas encore), champ
-  `rayon` des courses présent en base mais sans interface, écran d'accueil en
-  tuiles à envisager si un sixième usage arrive.
+  `rayon` des courses présent en base mais sans interface.
+- **Pas d'écran d'accueil en tuiles.** À cinq usages il ne ferait qu'ajouter un
+  détour avant la barre du bas. La question se reposera au sixième — mais la
+  barre sature à cinq, donc ce sera l'un ou l'autre.
 - Le carnet d'idées vit dans Réglages → Idées d'évolution, en base : c'est là
   qu'Alice note ce qu'elle veut voir arriver.

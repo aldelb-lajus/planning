@@ -2,10 +2,31 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#175E5A">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5EAD8" id="metaTheme">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8F%A1%3C/text%3E%3C/svg%3E">
 <title>Chez F&amp;A</title>
+
+<!-- Le thème choisi s'applique AVANT la première peinture : lu ici en synchrone,
+     il éviterait sinon un éclair blanc à chaque ouverture en mode sombre.
+     Absent = « Auto », et c'est prefers-color-scheme qui décide. -->
+<script>
+try{
+  var t = localStorage.getItem("app:theme");
+  if(t === "clair" || t === "sombre") document.documentElement.dataset.theme = t;
+  var sombre = t === "sombre" || (t !== "clair"
+    && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.getElementById("metaTheme").content = sombre ? "#1B1916" : "#F5EAD8";
+}catch(e){}
+</script>
+
+<!-- Caprasimo pour les titres, Figtree pour le texte. Marqués « optionnel » :
+     hors réseau, la police ne se charge pas et l'appli retombe sur les
+     substituts déclarés dans app.css — ce n'est pas une panne de démarrage. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" data-optionnel>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin data-optionnel>
+<link rel="stylesheet" data-optionnel
+      href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="css/app.css">
 
 <!-- Filet de sécurité, à enregistrer avant tout le reste : les deux écrans
@@ -15,6 +36,7 @@
 <script>
 window.addEventListener("error", function(ev){
   var app = document.getElementById("appEcran"), auth = document.getElementById("authEcran");
+  if(ev.target && ev.target.hasAttribute && ev.target.hasAttribute("data-optionnel")) return;
   if(!auth || !auth.hidden) return;      /* écran de connexion déjà affiché */
   if(app && !app.hidden) return;         /* l'appli tourne : ce n'est pas un échec de démarrage */
   var src = ev.target && ev.target.src;
@@ -34,25 +56,30 @@ window.addEventListener("error", function(ev){
 
 <!-- ======== écran de connexion (masqué une fois la session ouverte) ======== -->
 <div id="authEcran" hidden>
-  <div class="wrap" style="max-width:420px;padding-top:56px">
+  <div class="wrap" style="max-width:440px;padding-top:64px">
+    <div class="rond plein" aria-hidden="true"
+         style="width:76px;height:76px;font-family:var(--titre);font-size:26px;margin-bottom:22px">F&amp;A</div>
     <h1>Chez F&amp;A</h1>
     <p class="sub">Une fois connecté, l'appareil le reste.</p>
     <div class="step">
       <!-- Un vrai formulaire : le navigateur propose alors d'enregistrer le mot
            de passe, et le remet tout seul aux fois suivantes. -->
       <form id="authForm">
-        <label for="authMail">Ton adresse mail</label>
+        <label for="authMail">Adresse mail</label>
         <input type="email" id="authMail" name="email" autocomplete="email" inputmode="email"
                placeholder="prenom@exemple.fr">
-        <label for="authMdp" style="margin-top:12px">Ton mot de passe</label>
+        <label for="authMdp" style="margin-top:18px">Mot de passe</label>
         <input type="password" id="authMdp" name="password" autocomplete="current-password">
-        <div class="row">
+        <div class="btns">
           <button type="submit" id="authBtn">Se connecter</button>
-          <button type="button" class="ghost" id="authLienBtn">Recevoir un lien</button>
+        </div>
+        <div class="btns" style="margin-top:8px">
+          <button type="button" class="ghost" id="authLienBtn"
+                  style="border-color:transparent;color:var(--act-fonce)">Recevoir un lien</button>
         </div>
       </form>
       <div id="authMsg"></div>
-      <p class="hint">Pas encore de mot de passe, ou oublié&nbsp;? Demande un lien&nbsp;:
+      <p class="note">Pas encore de mot de passe, ou oublié&nbsp;? Demande un lien&nbsp;:
         il ouvre l'appli connectée, et tu poses ton mot de passe dans
         Réglages → Compte. Ouvre le lien sur cet appareil, dans ce navigateur.</p>
     </div>
@@ -63,52 +90,93 @@ window.addEventListener("error", function(ev){
 
   <!-- ======== onglet Courses ======== -->
   <section class="tab" data-tab="courses" hidden>
-    <div class="step">
-      <h2>Liste de courses</h2>
-      <div class="row" style="margin-top:0">
-        <div style="flex:3">
-          <label for="coursesAjout">Ajouter</label>
-          <input type="text" id="coursesAjout" placeholder="lait, pain, œufs…"
-                 autocomplete="off" enterkeyhint="done">
-        </div>
-        <div style="flex:0 0 auto;display:flex;align-items:flex-end">
-          <button id="coursesAjoutBtn">Ajouter</button>
-        </div>
+    <header class="ecran-tete">
+      <div>
+        <p class="kicker" id="coursesInfo"></p>
+        <h2>Courses</h2>
       </div>
-      <p class="hint" style="margin-top:6px">Sépare par des virgules pour en ajouter plusieurs d'un coup.</p>
-      <div id="coursesSugg"></div>
-      <p class="meta hint" id="coursesInfo" style="margin:14px 0 0"></p>
-      <div id="coursesUndo" class="undo" hidden></div>
-      <div id="coursesListe"></div>
-      <div id="coursesPris"></div>
+    </header>
+
+    <div class="ajout">
+      <label for="coursesAjout" class="visuellement-cache"
+             style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Ajouter</label>
+      <input type="text" id="coursesAjout" placeholder="lait, pain, œufs…"
+             autocomplete="off" enterkeyhint="done">
+      <button id="coursesAjoutBtn" aria-label="Ajouter à la liste">+</button>
     </div>
-    <p class="foot">Cocher ne supprime rien&nbsp;: l'article se barre et descend dans «&nbsp;Pris&nbsp;».<br>
-    La liste ne se vide qu'avec «&nbsp;Terminer les courses&nbsp;».</p>
+
+    <div id="coursesSugg"></div>
+    <div id="coursesUndo" class="undo" hidden></div>
+    <div id="coursesListe"></div>
+    <div id="coursesPris"></div>
+
+    <details class="aide">
+      <summary>Comment ça marche</summary>
+      <div class="corps">
+        <ul>
+          <li>Sépare par des virgules pour en ajouter plusieurs d'un coup.</li>
+          <li>Cocher ne supprime rien&nbsp;: l'article se barre et descend dans «&nbsp;Pris&nbsp;».</li>
+          <li>«&nbsp;Terminer les courses&nbsp;» ne retire que les articles pris&nbsp;;
+            ceux qui restent à prendre demeurent dans la liste.</li>
+          <li>Chaque article pris rejoint le catalogue. Les huit plus repris sont
+            proposés en raccourci au-dessus de la liste — sauf ceux qui y figurent déjà.</li>
+          <li>Toute suppression laisse cinq secondes pour revenir en arrière.</li>
+        </ul>
+      </div>
+    </details>
   </section>
 
   <!-- ======== onglet Agenda ======== -->
   <section class="tab" data-tab="agenda" hidden>
-    <div class="step">
-      <h2>Agenda</h2>
-      <p class="meta hint" id="agendaInfo" style="margin:0"></p>
-      <div class="btns">
-        <button class="ghost" id="agVueGrille" aria-pressed="false">Grille</button>
-        <button class="ghost" id="agVueListe" aria-pressed="true">Liste</button>
+    <header class="ecran-tete">
+      <div>
+        <p class="kicker" id="agendaInfo"></p>
+        <h2>Agenda</h2>
       </div>
-      <div id="agendaListe"></div>
-      <div class="btns">
-        <button id="evtNouveau">+ Nouvel événement</button>
+      <div class="actions">
+        <div class="btns segment">
+          <button id="agVueGrille" aria-pressed="false">Grille</button>
+          <button id="agVueListe" aria-pressed="true">Liste</button>
+        </div>
       </div>
-    </div>
-    <p class="foot">Appuie sur un événement pour le modifier.<br>
-    Le poste de Fab s'affiche en face de chaque événement d'un seul jour&nbsp;—
-    et teinte le fond des jours travaillés en vue grille.</p>
+    </header>
+
+    <nav class="filtres" id="agendaFiltres" aria-label="Filtrer par personne" hidden></nav>
+    <div id="agendaListe"></div>
+
+    <details class="aide">
+      <summary>Comment ça marche</summary>
+      <div class="corps">
+        <ul>
+          <li>Appuie sur un événement pour le modifier ou le supprimer.</li>
+          <li>En vue grille, un appui sur la case ouvre le jour entier&nbsp;; un appui
+            sur un émoji ouvre directement cet événement-là.</li>
+          <li>Le fond teinté d'une case dit le poste de Fab, la lettre son code.</li>
+        </ul>
+      </div>
+    </details>
+
+    <button class="fab" id="evtNouveau" aria-label="Nouvel événement">+</button>
   </section>
 
   <!-- ======== onglet Rappels ======== -->
   <section class="tab" data-tab="rappels" hidden>
-    <div class="step">
-      <h2>Ajouter</h2>
+    <header class="ecran-tete">
+      <div>
+        <p class="kicker" id="rappelsInfo"></p>
+        <h2>Rappels</h2>
+      </div>
+      <div class="actions">
+        <button class="rond plein" id="rapNouveau" aria-expanded="false"
+                aria-controls="rapForm" aria-label="Ajouter un rappel">+</button>
+      </div>
+    </header>
+
+    <!-- Le formulaire d'ajout ne s'ouvre qu'à la demande : la question posée en
+         arrivant sur cet écran est « qu'est-ce qui arrive ? », pas « qu'est-ce
+         que j'ajoute ? ». -->
+    <div class="step" id="rapForm" hidden>
+      <h2>Ajouter un rappel</h2>
       <label for="rapTitre">Quoi&nbsp;?</label>
       <input type="text" id="rapTitre" placeholder="ex. vermifuge de Minou" autocomplete="off">
       <div class="row">
@@ -144,27 +212,40 @@ window.addEventListener("error", function(ev){
       </div>
       <label for="rapNote">Note (facultative)</label>
       <input type="text" id="rapNote" placeholder="ex. pipette dans le cou, 2,5 kg" autocomplete="off">
-      <div class="row">
+      <div class="btns">
         <button id="rapAjout">Ajouter le rappel</button>
       </div>
       <div id="rapMsg"></div>
     </div>
-    <div class="step">
-      <h2>Ce qui arrive</h2>
-      <p class="meta hint" id="rappelsInfo" style="margin:0 0 4px"></p>
-      <nav class="filtres" id="rappelsFiltres" aria-label="Filtrer par catégorie"></nav>
-      <div id="rappelsListe"></div>
-    </div>
-    <p class="foot">Appuie sur un rappel pour le modifier.<br>
-    «&nbsp;Fait&nbsp;» consigne la date et repousse le rappel d'une période&nbsp;—
-    l'historique répond à «&nbsp;c'était quand, la dernière fois&nbsp;?&nbsp;».</p>
+
+    <nav class="filtres" id="rappelsFiltres" aria-label="Filtrer les rappels"></nav>
+    <div id="rappelsListe"></div>
+
+    <details class="aide">
+      <summary>Comment ça marche</summary>
+      <div class="corps">
+        <ul>
+          <li>«&nbsp;Fait&nbsp;» consigne la date et repousse le rappel d'une période.</li>
+          <li>Appuie sur un rappel pour le modifier ou le supprimer.</li>
+          <li>Un seul filtre à la fois&nbsp;: par personne <em>ou</em> par catégorie.
+            Le prénom reste affiché sur chaque ligne, quel que soit le filtre.</li>
+        </ul>
+      </div>
+    </details>
   </section>
 
   <!-- ======== onglet Planning ========
        Importer, Exporter et les codes sont des opérations SUR le planning :
        ils vivent donc dans le planning, pas à côté de lui dans la barre du bas.
-       Celle-ci ne porte que les usages — courses, planning, et demain l'agenda. -->
+       Celle-ci ne porte que les usages. -->
   <section class="tab" data-tab="planning" hidden>
+    <header class="ecran-tete">
+      <div>
+        <p class="kicker">Chez F&amp;A</p>
+        <h2>Planning</h2>
+      </div>
+    </header>
+
     <nav class="subtabs" aria-label="Sections du planning">
       <button data-sub="voir" aria-current="page">Le planning</button>
       <button data-sub="importer" aria-current="false">Importer</button>
@@ -176,73 +257,92 @@ window.addEventListener("error", function(ev){
     <div class="subtab" data-sub="voir">
       <div id="next"></div>
       <div class="step">
-        <h2>Ton planning</h2>
-        <p class="meta hint" id="planInfo" style="margin:0"></p>
-        <div id="planNotes"></div>
-        <div class="btns">
-          <button class="ghost" id="viewGrid" aria-pressed="true">Grille</button>
-          <button class="ghost" id="viewList" aria-pressed="false">Liste</button>
+        <div class="ecran-tete" style="margin-bottom:10px">
+          <div>
+            <p class="kicker" id="planInfo"></p>
+          </div>
+          <div class="actions">
+            <div class="btns segment">
+              <button id="viewGrid" aria-pressed="true">Grille</button>
+              <button id="viewList" aria-pressed="false">Liste</button>
+            </div>
+          </div>
         </div>
+        <div id="planNotes"></div>
         <div id="planView"></div>
-        <p class="planhint-grid" id="gridHint">👉 Heures détaillées dans la vue <strong>Liste</strong>.</p>
-        <p class="hint" id="planTip" style="margin-top:12px">Appuie sur un jour pour le modifier à la main.</p>
+        <p class="planhint-grid" id="gridHint">Heures détaillées dans la vue <strong>Liste</strong>.</p>
         <div class="btns">
-          <button class="ghost" id="addWeek">+ Ajouter une semaine</button>
-          <button class="ghost" id="delWeek">− Retirer une semaine</button>
-          <button class="ghost danger" id="clearPlan">Effacer le planning</button>
+          <button class="ghost" id="addWeek">+ Une semaine</button>
+          <button class="ghost" id="delWeek">− Une semaine</button>
         </div>
       </div>
     </div>
 
     <!-- ---- importer un cycle ---- -->
     <div class="subtab" data-sub="importer" hidden>
-    <div class="step">
-      <h2>Ta ligne</h2>
-      <textarea id="line" placeholder="Colle ici les codes de ton cycle, un par jour."></textarea>
-      <div class="row">
-        <div>
-          <label for="start">Premier jour du cycle</label>
-          <input type="date" id="start">
+      <div class="step">
+        <h2>Ta ligne</h2>
+        <textarea id="line" placeholder="Colle ici les codes de ton cycle, un par jour."></textarea>
+        <div class="row">
+          <div>
+            <label for="start">Premier jour du cycle</label>
+            <input type="date" id="start">
+          </div>
         </div>
+        <div id="parseInfo"></div>
+        <div class="btns">
+          <button id="saveCycle" disabled>Ajouter au planning</button>
+        </div>
+        <div id="saveMsg"></div>
       </div>
-      <div id="parseInfo"></div>
-      <div class="row">
-        <button id="saveCycle" disabled>Ajouter au planning</button>
-      </div>
-      <div id="saveMsg"></div>
-    </div>
-    <p class="foot">Le planning importé est partagé avec l’autre compte&nbsp;:
-    inutile de refaire l'import sur chaque appareil.<br>
-    Chaque appareil garde une copie pour l'affichage hors réseau.</p>
+      <details class="aide">
+        <summary>Comment ça marche</summary>
+        <div class="corps">
+          <ul>
+            <li>Le planning importé est partagé avec l'autre compte&nbsp;: inutile de
+              refaire l'import sur chaque appareil.</li>
+            <li>Chaque appareil garde une copie pour l'affichage hors réseau.</li>
+          </ul>
+        </div>
+      </details>
     </div>
 
     <!-- ---- exporter vers un calendrier ---- -->
     <div class="subtab" data-sub="exporter" hidden>
-    <div class="step">
-      <h2>Exporter</h2>
-      <div class="row" style="margin-top:0">
-        <div>
-          <label for="expStart">Du</label>
-          <input type="date" id="expStart">
+      <div class="step">
+        <h2>Plage à exporter</h2>
+        <div class="row" style="margin-top:0">
+          <div>
+            <label for="expStart">Du</label>
+            <input type="date" id="expStart">
+          </div>
+          <div>
+            <label for="expEnd">Au (inclus)</label>
+            <input type="date" id="expEnd">
+          </div>
         </div>
-        <div>
-          <label for="expEnd">Au (inclus)</label>
-          <input type="date" id="expEnd">
+        <p class="hint" id="expInfo"></p>
+        <div class="btns">
+          <button id="expIcs">Exporter .ics</button>
+          <button class="ghost" id="expGcal">Google Agenda</button>
         </div>
+        <div class="btns">
+          <button class="ghost" id="expPdfGrid">PDF grille</button>
+          <button class="ghost" id="expPdfList">PDF liste</button>
+        </div>
+        <div id="exportMsg"></div>
       </div>
-      <p class="hint" id="expInfo"></p>
-      <div class="btns">
-        <button id="expIcs">Exporter .ics</button>
-        <button class="ghost" id="expGcal">Google Agenda</button>
-        <button class="ghost" id="expPdfGrid">PDF grille</button>
-        <button class="ghost" id="expPdfList">PDF liste</button>
-      </div>
-      <div id="exportMsg"></div>
-    </div>
-    <p class="foot">.ics&nbsp;: ouvre le fichier téléchargé, l'iPhone propose de l'ajouter à un calendrier.<br>
-    PDF&nbsp;: la boîte d'impression s'ouvre, choisis «&nbsp;Enregistrer en PDF&nbsp;».<br>
-    Les alertes du calendrier ne sonnent pas en mode silencieux&nbsp;— c'est le raccourci
-    «&nbsp;Réveils&nbsp;» qui pose les vraies alarmes à partir de ces événements.</p>
+      <details class="aide">
+        <summary>Comment ça marche</summary>
+        <div class="corps">
+          <ul>
+            <li>.ics&nbsp;: ouvre le fichier téléchargé, l'iPhone propose de l'ajouter
+              à un calendrier.</li>
+            <li>PDF&nbsp;: la boîte d'impression s'ouvre, choisis
+              «&nbsp;Enregistrer en PDF&nbsp;».</li>
+          </ul>
+        </div>
+      </details>
     </div>
 
     <!-- ---- codes et horaires : la configuration propre au planning ---- -->
@@ -256,7 +356,7 @@ window.addEventListener("error", function(ev){
       <div class="step">
         <h2>Tes codes</h2>
         <div id="codesArea"><p class="msg">Aucun code pour l'instant. Ils apparaîtront au premier import.</p></div>
-        <p class="hint">À remplir une seule fois : les horaires sont réutilisés d'un cycle à l'autre.
+        <p class="hint">À remplir une seule fois&nbsp;: les horaires sont réutilisés d'un cycle à l'autre.
           <strong>M</strong> et <strong>m</strong> sont deux postes différents.</p>
       </div>
       <div class="step">
@@ -274,60 +374,66 @@ window.addEventListener("error", function(ev){
        propres réglages : sans cette règle, cet onglet redeviendrait le fourre-tout
        de tous les modules à mesure qu'ils arrivent. -->
   <section class="tab" data-tab="reglages" hidden>
+    <header class="ecran-tete">
+      <div>
+        <p class="kicker" id="syncInfo"></p>
+        <h2>Réglages</h2>
+      </div>
+    </header>
+
+    <div class="step">
+      <h2>Apparence</h2>
+      <div class="theme-choix" id="themeChoix" role="group" aria-label="Thème de l'appli">
+        <button data-theme="auto" aria-pressed="true">Auto</button>
+        <button data-theme="clair" aria-pressed="false">Clair</button>
+        <button data-theme="sombre" aria-pressed="false">Sombre</button>
+      </div>
+      <p class="hint">«&nbsp;Auto&nbsp;» suit le réglage du téléphone. Le choix reste
+        sur cet appareil&nbsp;: chacun peut avoir le sien.</p>
+    </div>
+
     <div class="step">
       <h2>Idées d'évolution</h2>
-      <label for="ideeTexte">Noter une idée</label>
       <textarea id="ideeTexte" rows="2" placeholder="ex. suivi des chats — vaccins, vermifuge…"
-                style="font-family:inherit;font-size:15px;white-space:normal;min-height:64px"></textarea>
-      <div class="row">
+                style="font-family:inherit;font-size:15px;white-space:normal;min-height:68px"></textarea>
+      <div class="btns">
         <button id="ideeBtn">Ajouter l'idée</button>
       </div>
-      <p class="meta hint" id="ideesInfo" style="margin:12px 0 0"></p>
       <div id="ideesListe"></div>
     </div>
+
     <div class="step">
       <h2>Compte et synchronisation</h2>
-      <p class="hint" id="syncInfo" style="margin:0 0 10px"></p>
+      <p class="hint" id="syncStatus" aria-live="polite" style="margin:0 0 12px"></p>
       <div id="syncCfg" hidden>
-        <label for="monPrenom">Ton prénom, tel qu'il apparaît dans l'appli</label>
-        <div class="row" style="margin-top:0">
-          <div style="flex:3"><input type="text" id="monPrenom" autocomplete="given-name" maxlength="24"></div>
-          <div style="flex:0 0 auto;display:flex;align-items:flex-end">
-            <button class="ghost" id="prenomSave">Enregistrer</button>
+        <div class="fiche">
+          <div>
+            <label for="monPrenom">Ton prénom, tel qu'il apparaît dans l'appli</label>
+            <div class="ajout" style="margin:0">
+              <input type="text" id="monPrenom" autocomplete="given-name" maxlength="24">
+              <button class="ghost" id="prenomSave" style="width:auto;padding:0 16px;font-size:13px">OK</button>
+            </div>
+            <div id="prenomMsg"></div>
+          </div>
+          <div>
+            <label for="monMdp">Ton mot de passe, pour te connecter sans passer par le mail</label>
+            <div class="ajout" style="margin:0">
+              <input type="password" id="monMdp" autocomplete="new-password"
+                     placeholder="huit caractères au moins">
+              <button class="ghost" id="mdpSave" style="width:auto;padding:0 16px;font-size:13px">OK</button>
+            </div>
+            <div id="mdpMsg"></div>
           </div>
         </div>
-        <div id="prenomMsg"></div>
-        <label for="monMdp" style="margin-top:14px">Ton mot de passe, pour te connecter
-          sans passer par le mail</label>
-        <div class="row" style="margin-top:0">
-          <div style="flex:3">
-            <input type="password" id="monMdp" autocomplete="new-password"
-                   placeholder="huit caractères au moins">
-          </div>
-          <div style="flex:0 0 auto;display:flex;align-items:flex-end">
-            <button class="ghost" id="mdpSave">Enregistrer</button>
-          </div>
-        </div>
-        <div id="mdpMsg"></div>
-        <div class="row">
+        <div class="btns">
           <button id="syncNowBtn">Synchroniser maintenant</button>
+        </div>
+        <div class="btns">
           <button class="ghost danger" id="deconnexion">Se déconnecter</button>
         </div>
       </div>
-      <p class="hint" id="syncStatus" aria-live="polite"></p>
     </div>
-    <div class="step">
-      <h2>Sauvegarde</h2>
-      <div class="row" style="margin-top:0">
-        <button class="ghost" id="expJson">Exporter les données (.json)</button>
-        <button class="ghost" id="impJsonBtn">Importer des données</button>
-      </div>
-      <input type="file" id="impJson" accept=".json,application/json" hidden>
-      <div id="backupMsg"></div>
-      <p class="hint">Le fichier contient codes, planning et réglages&nbsp;: c'est le filet
-        indépendant de Supabase, celui qui permet de repartir si le service disparaît.
-        À l'import, ce qui vient du fichier remplace ce qui existe en double, le reste est conservé.</p>
-    </div>
+
   </section>
 </div>
 
@@ -336,15 +442,26 @@ window.addEventListener("error", function(ev){
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.58.0/dist/umd/supabase.min.js"></script>
 
 <nav class="tabs" id="barreOnglets" aria-label="Navigation" hidden>
-  <button data-tab="courses" aria-current="false">Courses<span id="coursesBadge" class="badge" hidden></span></button>
-  <span class="sep" aria-hidden="true"></span>
-  <button data-tab="rappels" aria-current="false">Rappels<span id="rappelsBadge" class="badge" hidden></span></button>
-  <span class="sep" aria-hidden="true"></span>
-  <button data-tab="agenda" aria-current="false">Agenda</button>
-  <span class="sep" aria-hidden="true"></span>
-  <button data-tab="planning" aria-current="false">Planning Fab<span id="planningBadge" class="badge" hidden></span></button>
-  <span class="sep" aria-hidden="true"></span>
-  <button data-tab="reglages" aria-current="false">Réglages</button>
+  <button data-tab="courses" aria-current="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.55L21 8H6"/><circle cx="10" cy="20" r="1.3"/><circle cx="17.5" cy="20" r="1.3"/></svg>
+    <span>Courses</span><span id="coursesBadge" class="badge" hidden></span>
+  </button>
+  <button data-tab="rappels" aria-current="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
+    <span>Rappels</span><span id="rappelsBadge" class="badge" hidden></span>
+  </button>
+  <button data-tab="agenda" aria-current="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+    <span>Agenda</span>
+  </button>
+  <button data-tab="planning" aria-current="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
+    <span>Planning</span><span id="planningBadge" class="badge" hidden></span>
+  </button>
+  <button data-tab="reglages" aria-current="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M3.8 7.2l2.6 1.5M17.6 15.3l2.6 1.5M3.8 16.8l2.6-1.5M17.6 8.7l2.6-1.5"/></svg>
+    <span>Réglages</span>
+  </button>
 </nav>
 
 <script type="module" src="js/app.js"></script>

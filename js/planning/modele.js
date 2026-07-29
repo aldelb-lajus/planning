@@ -16,14 +16,18 @@ export let ref = {};
 export let jours = {};
 export let prefs = {lead:45, calName:"Travail"};
 
+/* La couleur d'un type ne se déclare plus ici : l'affichage pose
+   `data-poste="matin"` et css/app.css choisit le fond et l'encre lisible
+   dessus. Deux tables de couleurs — une en CSS, une en JS — auraient dérivé
+   l'une de l'autre au premier changement de palette. */
 export const TYPES = {
-  matin:   {lbl:"Matin",      c:"var(--matin)"},
-  aprem:   {lbl:"Après-midi", c:"var(--aprem)"},
-  nuit:    {lbl:"Nuit",       c:"var(--nuit)"},
-  jour:    {lbl:"Journée",    c:"var(--jour)"},
-  repos:   {lbl:"Repos",      c:"var(--repos)"},
-  vacances:{lbl:"Vacs",       c:"var(--vacances)"},
-  autre:   {lbl:"Autre",      c:"var(--autre)"}
+  matin:   {lbl:"Matin"},
+  aprem:   {lbl:"Après-midi"},
+  nuit:    {lbl:"Nuit"},
+  jour:    {lbl:"Journée"},
+  repos:   {lbl:"Repos"},
+  vacances:{lbl:"Vacs"},
+  autre:   {lbl:"Autre"}
 };
 
 /* jours sans réveil : repos et vacances (informatifs, jamais d'alarme) */
@@ -60,7 +64,6 @@ export function ecrireCache(){
 export const remplacerRef   = o => { ref = o || {}; };
 export const remplacerJours = o => { jours = o || {}; };
 export const remplacerPrefs = o => { prefs = Object.assign({lead:45, calName:"Travail"}, o || {}); };
-export const viderJours     = () => { jours = {}; };
 
 /* ---------- codes ---------- */
 export function guessType(code){

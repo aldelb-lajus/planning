@@ -3,7 +3,8 @@
    C'est le seul fichier qui connaisse tout le monde. Les modules, eux, ne se
    connaissent pas entre eux — ils passent par le bus de signaux. */
 
-import {$, esc, showTab, brancherOnglets} from "./noyau/ui.js";
+import {$, esc, showTab, brancherOnglets, demanderConfirmation} from "./noyau/ui.js";
+import {brancherTheme} from "./noyau/theme.js";
 import {store, deballer} from "./noyau/store.js";
 import {sur, emettre} from "./noyau/signal.js";
 import * as Auth from "./noyau/supabase.js";
@@ -58,7 +59,9 @@ function majBadges(){
 function setSyncStatus(txt, warn){
   const el = $("syncStatus");
   el.textContent = txt;
-  el.style.color = warn ? "#7A5310" : "";
+  /* la teinte d'avertissement vient des jetons : elle doit rester lisible en
+     mode sombre, où un brun fixe se noierait dans le fond */
+  el.style.color = warn ? "var(--attention)" : "";
 }
 
 /* ---------- synchronisation ---------- */
@@ -183,6 +186,7 @@ function erreurDansAdresse(){
 }
 
 /* ---------- câblage ---------- */
+brancherTheme();
 brancherOnglets();
 brancherImporter();
 brancherPlanning();
@@ -221,7 +225,9 @@ $("monMdp").addEventListener("keydown", e => {
   if(e.key === "Enter"){ e.preventDefault(); $("mdpSave").click(); }
 });
 $("deconnexion").addEventListener("click", async () => {
-  if(!confirm("Se déconnecter de cet appareil ?")) return;
+  if(!await demanderConfirmation("Se déconnecter de cet appareil ?",
+    "Il faudra retaper ton adresse et ton mot de passe pour revenir.",
+    {valider:"Se déconnecter", danger:true})) return;
   await Auth.deconnecter();
   location.reload();
 });

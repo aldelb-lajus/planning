@@ -13,7 +13,7 @@
    Un rappel garde son historique : « c'était quand, la dernière fois ? » est
    exactement la question à laquelle l'appli doit répondre. */
 
-import {$, esc, ouvrirFeuille} from "../noyau/ui.js";
+import {$, esc, ouvrirFeuille, demanderConfirmation, demanderValeur} from "../noyau/ui.js";
 import {emettre} from "../noyau/signal.js";
 import {store, emballer} from "../noyau/store.js";
 import {creerSync} from "../noyau/sync.js";
@@ -26,11 +26,11 @@ export let faits = {};     // id -> {rappelId, faitLe, note}
 /* L'émoji sert de repère visuel dans la liste : on retrouve d'un coup d'œil
    ce qui concerne les chats sans lire les libellés. */
 export const CATEGORIES = {
-  chat:  {lbl:"Chats",         emoji:"🐾", c:"var(--matin)"},
-  maison:{lbl:"Maison",        emoji:"🏠", c:"var(--jour)"},
-  admin: {lbl:"Administratif", emoji:"📄", c:"var(--nuit)"},
-  sante: {lbl:"Santé",         emoji:"💊", c:"var(--aprem)"},
-  autre: {lbl:"Autre",         emoji:"✨", c:"var(--autre)"}
+  chat:  {lbl:"Chats",         emoji:"🐾"},
+  maison:{lbl:"Maison",        emoji:"🏠"},
+  admin: {lbl:"Administratif", emoji:"📄"},
+  sante: {lbl:"Santé",         emoji:"💊"},
+  autre: {lbl:"Autre",         emoji:"✨"}
 };
 
 /* Raccourcis proposés ; « Personnalisée » ouvre la saisie libre juste à côté. */
@@ -198,10 +198,11 @@ export function supprimerRappel(id){
   save();
 }
 
-/* « Personne » d'abord : la plupart des rappels concernent la maison, pas
-   quelqu'un en particulier. */
+/* « Commun » d'abord : la plupart des rappels ne sont à personne en
+   particulier. Le mot dit à qui la chose appartient, là où « Personne »
+   se lisait comme « ce rappel n'intéresse personne ». */
 function optionsPersonnes(choisi){
-  return `<option value="">Personne</option>`
+  return `<option value="">Commun</option>`
     + membres().map(m =>
         `<option value="${m.id}"${m.id === choisi ? " selected" : ""}>${esc(m.prenom)}</option>`).join("");
 }
@@ -267,8 +268,11 @@ export function ouvrirEditeurRappel(id){
     $("rmPeriode").addEventListener("change", majBlocs);
     majBlocs();
 
-    ov.querySelector("#rmSuppr").addEventListener("click", () => {
-      if(!confirm(`Supprimer « ${r.titre} » ?${n ? `\nSon historique (${n} entrée${n>1?"s":""}) part aussi.` : ""}`)) return;
+    ov.querySelector("#rmSuppr").addEventListener("click", async () => {
+      if(!await demanderConfirmation(`Supprimer « ${r.titre} » ?`,
+        n ? `Son historique (${n} entrée${n>1?"s":""}) part aussi.`
+          : "Ce rappel sera retiré de la liste.",
+        {valider:"Supprimer", danger:true})) return;
       supprimerRappel(id);
       fermer();
       emettre("rendre");
@@ -317,7 +321,7 @@ function echeanceTexte(jours){
    Et le prénom reste affiché sur chaque ligne, quel que soit le filtre — donc
    l'information ne dépend jamais du filtre choisi.
 
-   Valeurs : "tout" · "moi:<id>" · "personne" · une clé de CATEGORIES. */
+   Valeurs : "tout" · "moi:<id>" · "commun" · une clé de CATEGORIES. */
 let filtre = "tout";
 
 export function renderRappels(){
@@ -327,8 +331,8 @@ export function renderRappels(){
   const retard = enRetard();
 
   $("rappelsInfo").innerHTML = tous.length
-    ? `${tous.length} rappel${tous.length>1?"s":""}`
-      + (retard ? ` · <strong style="color:var(--danger)">${retard} en retard</strong>` : "")
+    ? (retard ? `<strong style="color:var(--attention)">${retard} en retard</strong> · ` : "")
+      + `${tous.length} au total`
     : "";
 
   if(!tous.length){
@@ -343,24 +347,28 @@ export function renderRappels(){
   const compteCat = {}, compteQui = {};
   tous.forEach(([, r]) => {
     compteCat[r.categorie] = (compteCat[r.categorie] || 0) + 1;
-    const cle = r.assigneA ? "moi:" + r.assigneA : "personne";
+    const cle = r.assigneA ? "moi:" + r.assigneA : "commun";
     compteQui[cle] = (compteQui[cle] || 0) + 1;
   });
 
   /* `groupe` marque le PREMIER bouton d'une famille : c'est lui qui porte le
-     trait de séparation. Le mettre sur chacun tracerait un trait partout. */
+     trait de séparation. Le mettre sur chacun tracerait un trait partout.
+
+     « Commun » passe avant les prénoms, comme dans le menu « Pour qui » et comme
+     dans l'agenda : ces trois listes désignent la même chose, elles n'ont aucune
+     raison de la classer différemment. */
   const boutons = [{cle:"tout", lbl:"Tout", n:tous.length}];
   let debutFamille = true;
+  if(compteQui["commun"]){
+    boutons.push({cle:"commun", lbl:"Commun", n:compteQui["commun"], groupe:true});
+    debutFamille = false;
+  }
   membres().forEach(m => {
     const cle = "moi:" + m.id;
     if(!compteQui[cle]) return;
     boutons.push({cle, lbl:m.prenom, n:compteQui[cle], groupe:debutFamille});
     debutFamille = false;
   });
-  if(compteQui["personne"]){
-    boutons.push({cle:"personne", lbl:"Personne", n:compteQui["personne"], groupe:debutFamille});
-    debutFamille = false;
-  }
   debutFamille = true;
   Object.entries(CATEGORIES).filter(([k]) => compteCat[k]).forEach(([k, c]) => {
     boutons.push({cle:k, lbl:`${c.emoji} ${c.lbl}`, n:compteCat[k], groupe:debutFamille});
@@ -381,11 +389,27 @@ export function renderRappels(){
 
   const liste =
       filtre === "tout"      ? tous
-    : filtre === "personne"  ? tous.filter(([, r]) => !r.assigneA)
+    : filtre === "commun"    ? tous.filter(([, r]) => !r.assigneA)
     : filtre.startsWith("moi:") ? tous.filter(([, r]) => r.assigneA === filtre.slice(4))
     : tous.filter(([, r]) => r.categorie === filtre);
 
-  box.innerHTML = `<ul class="clist">${liste.map(([id, r]) => {
+  /* Quatre moments, dans l'ordre où ils réclament quelque chose. Une liste plate
+     de neuf rappels laisse chercher lequel est en retard ; ces intertitres le
+     disent avant qu'on ait lu une seule ligne. Un groupe vide ne s'affiche pas —
+     un intertitre sans rien dessous ne fait qu'allonger l'écran. */
+  const GROUPES = [
+    {cle:"retard",   titre:"En retard"},
+    {cle:"semaine",  titre:"Cette semaine"},
+    {cle:"tard",     titre:"Plus tard"},
+    {cle:"sansdate", titre:"Sans date"}
+  ];
+  const groupeDe = r => {
+    if(!r.prochaineLe) return "sansdate";
+    const j = joursAvant(r.prochaineLe);
+    return j < 0 ? "retard" : j <= 7 ? "semaine" : "tard";
+  };
+
+  const ligneRappel = (id, r, urgent) => {
     const cat = CATEGORIES[r.categorie] || CATEGORIES.autre;
     const dernier = dernierFait(id);
     /* sans date, la périodicité n'a rien à ajouter — inutile de répéter « sans date » */
@@ -403,8 +427,8 @@ export function renderRappels(){
     /* Titre et prénom sont enfermés ensemble dans « ctitre » : « clib » empile
        ses enfants en colonne, un prénom posé à côté du titre y tomberait à la
        ligne suivante. */
-    return `<li class="citem" data-rap="${id}" role="button" tabindex="0">
-      <span class="emo" title="${esc(cat.lbl)}">${cat.emoji}</span>
+    return `<li class="citem${urgent ? " urgent" : ""}" data-rap="${id}" role="button" tabindex="0">
+      <span class="emo" data-cat="${esc(r.categorie)}" title="${esc(cat.lbl)}">${cat.emoji}</span>
       <span class="clib">
         <span class="ctitre">${esc(r.titre)}${qui ? `<span class="qui">${esc(qui)}</span>` : ""}</span>
         <small class="par">${quand}</small>
@@ -412,17 +436,32 @@ export function renderRappels(){
         ${r.note ? `<small class="par">${esc(r.note)}</small>` : ""}</span>
       <button class="ghost fait" data-fait="${id}">Fait</button>
     </li>`;
-  }).join("")}</ul>`;
+  };
+
+  box.innerHTML = GROUPES.map(g => {
+    const dedans = liste.filter(([, r]) => groupeDe(r) === g.cle);
+    if(!dedans.length) return "";
+    return `<div class="lmois">${g.titre}</div>`
+      + `<ul class="clist">${dedans.map(([id, r]) =>
+           ligneRappel(id, r, g.cle === "retard")).join("")}</ul>`;
+  }).join("")
+  || `<p class="msg">Aucun rappel ne correspond à ce filtre.</p>`;
 
   /* « Fait » d'abord : sans le stopPropagation, il ouvrirait aussi l'éditeur. */
+  /* « Fait » d'abord : sans le stopPropagation, il ouvrirait aussi l'éditeur.
+     La date se choisit dans un champ date natif — la saisie libre d'un
+     `prompt()` obligeait à vérifier le format derrière, et ne s'affichait de
+     toute façon pas sur un téléphone. */
   box.querySelectorAll("[data-fait]").forEach(b =>
-    b.addEventListener("click", e => {
+    b.addEventListener("click", async e => {
       e.stopPropagation();
       const id = b.dataset.fait;
       const r = rappels[id];
-      const quand = prompt(`Quand « ${r.titre} » a-t-il été fait ?`, isoInput(new Date()));
+      const quand = await demanderValeur(`« ${r.titre} », c'était quand ?`, {
+        label: "Date", type: "date", valeur: isoInput(new Date()),
+        obligatoire: "Il faut une date pour consigner ce rappel."
+      });
       if(quand === null) return;
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(quand)){ alert("Date attendue au format AAAA-MM-JJ."); return; }
       marquerFait(id, quand);
       emettre("rendre");
     }));
@@ -452,6 +491,17 @@ export function majPersonnes(){
   if(sel) sel.innerHTML = optionsPersonnes(sel.value);
 }
 
+/* Le formulaire d'ajout est replié par défaut : la question qu'on se pose en
+   arrivant ici est « qu'est-ce qui arrive ? », pas « qu'est-ce que j'ajoute ? ».
+   Le « + » de l'en-tête l'ouvre, et l'ajout réussi le referme. */
+function ouvrirFormulaire(ouvert){
+  const form = $("rapForm"), btn = $("rapNouveau");
+  form.hidden = !ouvert;
+  btn.setAttribute("aria-expanded", String(ouvert));
+  btn.textContent = ouvert ? "×" : "+";
+  if(ouvert) $("rapTitre").focus();
+}
+
 export function brancherRappels(){
   $("rapCat").innerHTML = Object.entries(CATEGORIES).map(([k, c]) =>
     `<option value="${k}"${k === "maison" ? " selected" : ""}>${c.emoji} ${c.lbl}</option>`).join("");
@@ -460,6 +510,8 @@ export function brancherRappels(){
     `<option value="${i}"${p.v === 3 ? " selected" : ""}>${p.lbl}</option>`).join("");
   $("rapPeriode").addEventListener("change", majFormulaire);
   majFormulaire();
+
+  $("rapNouveau").addEventListener("click", () => ouvrirFormulaire($("rapForm").hidden));
 
   $("rapAjout").addEventListener("click", () => {
     const choix = PERIODES[$("rapPeriode").selectedIndex];
@@ -479,6 +531,7 @@ export function brancherRappels(){
     }
     ["rapTitre","rapNote"].forEach(i => $(i).value = "");
     $("rapMsg").innerHTML = "";
+    ouvrirFormulaire(false);
     emettre("rendre");
   });
 

@@ -1,6 +1,6 @@
 /* Planning → Codes : le tableau des horaires de chaque poste. */
 
-import {$, esc} from "../noyau/ui.js";
+import {$, esc, demanderConfirmation} from "../noyau/ui.js";
 import {emettre} from "../noyau/signal.js";
 import * as M from "./modele.js";
 
@@ -30,7 +30,7 @@ export function renderCodes(){
     const k = M.ref[c];
     const off = M.NOALARM(k.type) ? " disabled" : "";
     h += `<tr${pend.includes(c) ? ' class="pend"' : ''}>
-      <td class="code"><span class="swatch" style="background:${M.TYPES[k.type].c}"></span>${esc(c)}${M.NOALARM(k.type) ? ` <span style="font-weight:500;color:var(--ink-soft)">${M.TYPES[k.type].lbl.toLowerCase()}</span>` : ''}${k.noReveil1 ? ` <span style="font-weight:500;color:var(--ink-soft)">· 1er créneau sans réveil</span>` : ''}</td>
+      <td class="code"><span class="swatch" data-poste="${esc(k.type)}"></span>${esc(c)}${M.NOALARM(k.type) ? ` <span style="font-weight:500;color:var(--ink-soft)">${M.TYPES[k.type].lbl.toLowerCase()}</span>` : ''}${k.noReveil1 ? ` <span style="font-weight:500;color:var(--ink-soft)">· 1er créneau sans réveil</span>` : ''}</td>
       <td><input type="time" data-c="${esc(c)}" data-f="debut" value="${k.debut}"${off} aria-label="Heure de début du code ${esc(c)}"></td>
       <td><input type="time" data-c="${esc(c)}" data-f="fin" value="${k.fin}"${off} aria-label="Heure de fin du code ${esc(c)}"></td>
       <td><button class="delcode" data-del="${esc(c)}" aria-label="Supprimer le code ${esc(c)}">✕</button></td>
@@ -61,11 +61,11 @@ export function renderCodes(){
     });
   });
   box.querySelectorAll("[data-del]").forEach(el => {
-    el.addEventListener("click", () => {
+    el.addEventListener("click", async () => {
       const c = el.dataset.del;
       const used = Object.values(M.jours).filter(x => x === c).length;
-      const extra = used ? ` Il est utilisé sur ${used} jour${used>1?"s":""} planifié${used>1?"s":""} : ces jours n'auront plus de réveil.` : "";
-      if(!confirm(`Supprimer le code ${c} ?${extra}`)) return;
+      const extra = used ? `Il est utilisé sur ${used} jour${used>1?"s":""} planifié${used>1?"s":""} : ces jours n'auront plus de réveil.` : "";
+      if(!await demanderConfirmation(`Supprimer le code ${c} ?`, extra, {valider:"Supprimer", danger:true})) return;
       delete M.ref[c];
       M.saveRef();
       emettre("rendre");
