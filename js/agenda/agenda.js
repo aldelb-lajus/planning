@@ -315,24 +315,30 @@ function grilleHtml(){
 
 /* ---------- rendu ---------- */
 /* Barre de filtres : « Tout », puis « Commun », puis un bouton par compte.
-   Comptée sur TOUS les événements, pas seulement ceux à venir : en vue grille
-   on remonte des mois passés, et un bouton qui disparaîtrait en chemin ferait
-   croire que le filtre a sauté. Un compte sans aucun événement n'a pas de
-   bouton — une barre dont la moitié des entrées mènent au vide n'aide personne. */
+   Le CHIFFRE ne compte que les événements à venir — un total qui ne baissait
+   jamais se lisait comme un reste à faire. La PRÉSENCE du bouton, elle, tient
+   au moindre événement, passé compris : en vue grille on remonte des mois
+   passés, et un bouton qui disparaîtrait en chemin ferait croire que le
+   filtre a sauté. Un compte sans aucun événement n'a pas de bouton — une
+   barre dont la moitié des entrées mènent au vide n'aide personne. */
 function renderFiltres(){
   const barre = $("agendaFiltres");
   const tous = Object.values(evenements);
   if(!barre) return;
 
-  const compte = cle => tous.filter(e =>
+  const auj = isoInput(new Date());
+  const futurs = tous.filter(e => dernierJour(e) >= auj);
+  const de = (cle, liste) => liste.filter(e =>
     cle === "commun" ? !e.assigneA : e.assigneA === cle.slice(4)).length;
+  const existe = cle => de(cle, tous);
+  const compte = cle => de(cle, futurs);
 
-  const boutons = [{cle:"tout", lbl:"Tout", n:tous.length}];
-  if(compte("commun")) boutons.push({cle:"commun", lbl:"Commun", n:compte("commun"), groupe:true});
+  const boutons = [{cle:"tout", lbl:"Tout", n:futurs.length}];
+  if(existe("commun")) boutons.push({cle:"commun", lbl:"Commun", n:compte("commun"), groupe:true});
   let debutFamille = !boutons.some(b => b.groupe);
   membres().forEach(m => {
     const cle = "moi:" + m.id;
-    if(!compte(cle)) return;
+    if(!existe(cle)) return;
     boutons.push({cle, lbl:m.prenom, n:compte(cle), groupe:debutFamille});
     debutFamille = false;
   });
